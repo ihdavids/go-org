@@ -1,4 +1,4 @@
-module github.com/niklasfasching/go-org
+module github.com/ihdavids/go-org
 
 go 1.18
 
