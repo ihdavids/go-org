@@ -1,6 +1,7 @@
 package org
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -24,6 +25,9 @@ func TestHTMLWriter(t *testing.T) {
 			t.Errorf("%s\n got error: %s", path, err)
 			continue
 		}
+		re := regexp.MustCompile(`\r?\n`)
+		actual = re.ReplaceAllString(actual, "\n")
+		expected = re.ReplaceAllString(expected, "\n")
 		if actual != expected {
 			t.Errorf("%s:\n%s'", path, diff(actual, expected))
 		} else {
