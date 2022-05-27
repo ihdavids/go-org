@@ -26,6 +26,7 @@ type Headline struct {
 	Status     string
 	Priority   string
 	Properties *PropertyDrawer
+	TimeTag    SDC
 	Title      []Node
 	Tags       []string
 	Children   []Node
@@ -95,15 +96,21 @@ type SDC struct {
 
 func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
-	return 1, SDC{d.tokens[i].Pos(), s, dt}
+	sdc := SDC{d.tokens[i].Pos(), s, dt}
+	d.Outline.last.Headline.TimeTag = sdc
+	return 1, sdc
 }
 func (d *Document) parseDeadline(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
-	return 1, SDC{d.tokens[i].Pos(), s, dt}
+	sdc := SDC{d.tokens[i].Pos(), s, dt}
+	d.Outline.last.Headline.TimeTag = sdc
+	return 1, sdc
 }
 func (d *Document) parseClosed(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
-	return 1, SDC{d.tokens[i].Pos(), s, dt}
+	sdc := SDC{d.tokens[i].Pos(), s, dt}
+	d.Outline.last.Headline.TimeTag = sdc
+	return 1, sdc
 }
 
 func trimFastTags(tags []string) []string {
