@@ -306,6 +306,17 @@ func (self *DateParser) Parse(line string) *OrgDate {
 	return nil
 }
 
+func ParseSDC(line string) *OrgDate {
+	d := OrgDateScheduled.Parse(line)
+	if d == nil {
+		d = OrgDateDeadline.Parse(line)
+	}
+	if d == nil {
+		d = OrgDateClosed.Parse(line)
+	}
+	return d
+}
+
 func (self *OrgDate) After(date time.Time) bool {
 	return (self.Start.Before(date) || self.Start.Equal(date))
 }

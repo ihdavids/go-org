@@ -11,6 +11,7 @@ type Table struct {
 	Rows             []Row
 	ColumnInfos      []ColumnInfo
 	SeparatorIndices []int
+	Pos              Pos
 }
 
 type Row struct {
@@ -34,11 +35,11 @@ var tableRowRegexp = regexp.MustCompile(`^(\s*)(\|.*)`)
 
 var columnAlignAndLengthRegexp = regexp.MustCompile(`^<(l|c|r)?(\d+)?>$`)
 
-func lexTable(line string) (token, bool) {
+func lexTable(line string, row, col int) (token, bool) {
 	if m := tableSeparatorRegexp.FindStringSubmatch(line); m != nil {
-		return token{"tableSeparator", len(m[1]), m[2], m}, true
+		return token{"tableSeparator", len(m[1]), m[2], m, Pos{row, col}}, true
 	} else if m := tableRowRegexp.FindStringSubmatch(line); m != nil {
-		return token{"tableRow", len(m[1]), m[2], m}, true
+		return token{"tableRow", len(m[1]), m[2], m, Pos{row, col}}, true
 	}
 	return nilToken, false
 }
@@ -60,14 +61,14 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := Table{nil, getColumnInfos(rawRows), separatorIndices}
+	table := Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[i].Pos()}
 	for _, rawColumns := range rawRows {
 		row := Row{nil, isSpecialRow(rawColumns)}
 		if len(rawColumns) != 0 {
 			for i := range table.ColumnInfos {
 				column := Column{nil, &table.ColumnInfos[i]}
 				if i < len(rawColumns) {
-					column.Children = d.parseInline(rawColumns[i])
+					column.Children = d.parseInline(rawColumns[i], i) // TODO: This is off by the row index
 				}
 				row.Columns = append(row.Columns, column)
 			}
@@ -135,3 +136,4 @@ func isSpecialRow(rawColumns []string) bool {
 }
 
 func (n Table) String() string { return orgWriter.WriteNodesAsString(n) }
+func (self Table) GetPos() Pos { return self.Pos }

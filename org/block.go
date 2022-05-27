@@ -8,16 +8,19 @@ import (
 
 type Block struct {
 	Name       string
+	Pos        Pos
 	Parameters []string
 	Children   []Node
 	Result     Node
 }
 
 type Result struct {
+	Pos  Pos
 	Node Node
 }
 
 type Example struct {
+	Pos      Pos
 	Children []Node
 }
 
@@ -27,25 +30,25 @@ var endBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END_(\w+)`)
 var resultRegexp = regexp.MustCompile(`(?i)^(\s*)#\+RESULTS:`)
 var exampleBlockEscapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*),([ \t]*)(\*|,\*|#\+|,#\+)`)
 
-func lexBlock(line string) (token, bool) {
+func lexBlock(line string, row, col int) (token, bool) {
 	if m := beginBlockRegexp.FindStringSubmatch(line); m != nil {
-		return token{"beginBlock", len(m[1]), strings.ToUpper(m[2]), m}, true
+		return token{"beginBlock", len(m[1]), strings.ToUpper(m[2]), m, Pos{row, col}}, true
 	} else if m := endBlockRegexp.FindStringSubmatch(line); m != nil {
-		return token{"endBlock", len(m[1]), strings.ToUpper(m[2]), m}, true
+		return token{"endBlock", len(m[1]), strings.ToUpper(m[2]), m, Pos{row, col}}, true
 	}
 	return nilToken, false
 }
 
-func lexResult(line string) (token, bool) {
+func lexResult(line string, row, col int) (token, bool) {
 	if m := resultRegexp.FindStringSubmatch(line); m != nil {
-		return token{"result", len(m[1]), "", m}, true
+		return token{"result", len(m[1]), "", m, Pos{row, col}}, true
 	}
 	return nilToken, false
 }
 
-func lexExample(line string) (token, bool) {
+func lexExample(line string, row, col int) (token, bool) {
 	if m := exampleLineRegexp.FindStringSubmatch(line); m != nil {
-		return token{"example", len(m[1]), m[3], m}, true
+		return token{"example", len(m[1]), m[3], m, Pos{row, col}}, true
 	}
 	return nilToken, false
 }
@@ -59,7 +62,7 @@ func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 	stop := func(d *Document, i int) bool {
 		return i >= len(d.tokens) || (d.tokens[i].kind == "endBlock" && d.tokens[i].content == name)
 	}
-	block, i := Block{name, parameters, nil, nil}, i+1
+	block, i := Block{name, d.tokens[start].Pos(), parameters, nil, nil}, i+1
 	if isRawTextBlock(name) {
 		rawText := ""
 		for ; !stop(d, i); i++ {
@@ -68,7 +71,7 @@ func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 		if name == "EXAMPLE" || (name == "SRC" && len(parameters) >= 1 && parameters[0] == "org") {
 			rawText = exampleBlockEscapeRegexp.ReplaceAllString(rawText, "$1$2$3$4")
 		}
-		block.Children = d.parseRawInline(rawText)
+		block.Children = d.parseRawInline(rawText, i)
 	} else {
 		consumed, nodes := d.parseMany(i, stop)
 		block.Children = nodes
@@ -98,8 +101,9 @@ func (d *Document) parseSrcBlockResult(i int, parentStop stopFn) (int, Node) {
 
 func (d *Document) parseExample(i int, parentStop stopFn) (int, Node) {
 	example, start := Example{}, i
+	example.Pos = d.tokens[i].Pos()
 	for ; !parentStop(d, i) && d.tokens[i].kind == "example"; i++ {
-		example.Children = append(example.Children, Text{d.tokens[i].content, true})
+		example.Children = append(example.Children, Text{d.tokens[i].Pos(), d.tokens[i].content, true})
 	}
 	return i - start, example
 }
@@ -109,7 +113,7 @@ func (d *Document) parseResult(i int, parentStop stopFn) (int, Node) {
 		return 0, nil
 	}
 	consumed, node := d.parseOne(i+1, parentStop)
-	return consumed + 1, Result{node}
+	return consumed + 1, Result{d.tokens[i].Pos(), node}
 }
 
 func trimIndentUpTo(max int) func(string) string {
@@ -148,3 +152,6 @@ func (b Block) ParameterMap() map[string]string {
 func (n Example) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n Block) String() string   { return orgWriter.WriteNodesAsString(n) }
 func (n Result) String() string  { return orgWriter.WriteNodesAsString(n) }
+func (self Example) GetPos() Pos { return self.Pos }
+func (self Block) GetPos() Pos   { return self.Pos }
+func (self Result) GetPos() Pos  { return self.Pos }

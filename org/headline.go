@@ -20,6 +20,7 @@ type Section struct {
 }
 
 type Headline struct {
+	Pos        Pos
 	Index      int
 	Lvl        int
 	Status     string
@@ -28,20 +29,21 @@ type Headline struct {
 	Title      []Node
 	Tags       []string
 	Children   []Node
+	// Schedules  []Schedule
 }
 
 var headlineRegexp = regexp.MustCompile(`^([*]+)\s+(.*)`)
 var tagRegexp = regexp.MustCompile(`(.*?)\s+(:[A-Za-z0-9_@#%:]+:\s*$)`)
 
-func lexHeadline(line string) (token, bool) {
+func lexHeadline(line string, row, col int) (token, bool) {
 	if m := headlineRegexp.FindStringSubmatch(line); m != nil {
-		return token{"headline", 0, m[2], m}, true
+		return token{"headline", 0, m[2], m, Pos{row, col}}, true
 	}
 	return nilToken, false
 }
 
 func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
-	t, headline := d.tokens[i], Headline{}
+	t, headline := d.tokens[i], Headline{Pos: d.tokens[i].Pos()}
 	headline.Lvl = len(t.matches[1])
 
 	headline.Index = d.addHeadline(&headline)
@@ -68,7 +70,7 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 		headline.Tags = strings.FieldsFunc(m[2], func(r rune) bool { return r == ':' })
 	}
 
-	headline.Title = d.parseInline(text)
+	headline.Title = d.parseInline(text, i)
 
 	stop := func(d *Document, i int) bool {
 		return parentStop(d, i) || d.tokens[i].kind == "headline" && len(d.tokens[i].matches[1]) <= headline.Lvl
@@ -127,3 +129,4 @@ func (parent *Section) add(current *Section) {
 }
 
 func (n Headline) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n Headline) GetPos() Pos    { return n.Pos }

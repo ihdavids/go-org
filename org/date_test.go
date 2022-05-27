@@ -20,3 +20,20 @@ func TestDateParse(t *testing.T) {
 		t.Logf(deadl.ToDate())
 	}
 }
+
+func TestParseSDC(t *testing.T) {
+	sched := ParseSDC("SCHEDULED: <2004-12-25 Sat>")
+	badsched := ParseSDC("DEADLINE: <2004-12-25 Sat>")
+	deadl := ParseSDC("DEADLINE: <2004-02-29 Sun>")
+	if sched.ToDate() != "<2004-12-25 Sat>" {
+		t.Fatalf("Scheduled did not pass: %s got %q %q", "2004-12-25", sched.Start.String(), sched.End.String())
+	}
+	if badsched.ToDate() != "<2004-12-25 Sat>" {
+		t.Fatalf("Bad Schedule parse parsed something erroneously")
+	}
+	if deadl.ToDate() != "<2004-02-29 Sun>" && !deadl.End.IsZero() {
+		t.Fatalf("Deadline parse did not pass: %s got %q %q", "2004-02-29", deadl.Start.String(), sched.End.String())
+	} else {
+		t.Logf(deadl.ToDate())
+	}
+}

@@ -48,17 +48,27 @@ type Document struct {
 // Node represents a parsed node of the document.
 type Node interface {
 	String() string // String returns the pretty printed Org mode string for the node (see OrgWriter).
+	GetPos() Pos    // Position in the file of the token
 }
 
-type lexFn = func(line string) (t token, ok bool)
+type lexFn = func(line string, row, col int) (t token, ok bool)
 type parseFn = func(*Document, int, stopFn) (int, Node)
 type stopFn = func(*Document, int) bool
 
+type Pos struct {
+	Row int
+	Col int
+}
 type token struct {
 	kind    string
 	lvl     int
 	content string
 	matches []string
+	pos     Pos
+}
+
+func (self token) Pos() Pos {
+	return self.pos
 }
 
 var lexFns = []lexFn{
@@ -75,7 +85,7 @@ var lexFns = []lexFn{
 	lexText,
 }
 
-var nilToken = token{"nil", -1, "", nil}
+var nilToken = token{"nil", -1, "", nil, Pos{0, 0}}
 var orgWriter = NewOrgWriter()
 
 // New returns a new Configuration with (hopefully) sane defaults.
@@ -150,8 +160,10 @@ func (c *Configuration) Silent() *Configuration {
 func (d *Document) tokenize(input io.Reader) {
 	d.tokens = []token{}
 	scanner := bufio.NewScanner(input)
+	lineNum := 0
 	for scanner.Scan() {
-		d.tokens = append(d.tokens, tokenize(scanner.Text()))
+		d.tokens = append(d.tokens, tokenize(scanner.Text(), lineNum))
+		lineNum += 1
 	}
 	if err := scanner.Err(); err != nil {
 		d.Error = fmt.Errorf("could not tokenize input: %s", err)
@@ -234,7 +246,7 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 	}
 	d.Log.Printf("Could not parse token %#v: Falling back to treating it as plain text.", d.tokens[i])
 	m := plainTextRegexp.FindStringSubmatch(d.tokens[i].matches[0])
-	d.tokens[i] = token{"text", len(m[1]), m[2], m}
+	d.tokens[i] = token{"text", len(m[1]), m[2], m, d.tokens[i].pos}
 	return d.parseOne(i, stop)
 }
 
@@ -256,9 +268,10 @@ func (d *Document) addHeadline(headline *Headline) int {
 	return d.Outline.count
 }
 
-func tokenize(line string) token {
+func tokenize(line string, row int) token {
+	col := 0
 	for _, lexFn := range lexFns {
-		if token, ok := lexFn(line); ok {
+		if token, ok := lexFn(line, row, col); ok {
 			return token
 		}
 	}

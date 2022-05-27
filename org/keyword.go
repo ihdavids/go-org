@@ -7,9 +7,13 @@ import (
 	"strings"
 )
 
-type Comment struct{ Content string }
+type Comment struct {
+	Pos     Pos
+	Content string
+}
 
 type Keyword struct {
+	Pos   Pos
 	Key   string
 	Value string
 }
@@ -40,28 +44,28 @@ var commentRegexp = regexp.MustCompile(`^(\s*)#\s(.*)`)
 var includeFileRegexp = regexp.MustCompile(`(?i)^"([^"]+)" (src|example|export) (\w+)$`)
 var attributeRegexp = regexp.MustCompile(`(?:^|\s+)(:[-\w]+)\s+(.*)$`)
 
-func lexKeywordOrComment(line string) (token, bool) {
+func lexKeywordOrComment(line string, row, col int) (token, bool) {
 	if m := keywordRegexp.FindStringSubmatch(line); m != nil {
-		return token{"keyword", len(m[1]), m[2], m}, true
+		return token{"keyword", len(m[1]), m[2], m, Pos{row, col}}, true
 	} else if m := commentRegexp.FindStringSubmatch(line); m != nil {
-		return token{"comment", len(m[1]), m[2], m}, true
+		return token{"comment", len(m[1]), m[2], m, Pos{row, col}}, true
 	}
 	return nilToken, false
 }
 
 func (d *Document) parseComment(i int, stop stopFn) (int, Node) {
-	return 1, Comment{d.tokens[i].content}
+	return 1, Comment{d.tokens[i].Pos(), d.tokens[i].content}
 }
 
 func (d *Document) parseKeyword(i int, stop stopFn) (int, Node) {
-	k := parseKeyword(d.tokens[i])
+	k := parseKeyword(d.tokens[i], i)
 	switch k.Key {
 	case "NAME":
 		return d.parseNodeWithName(k, i, stop)
 	case "SETUPFILE":
 		return d.loadSetupFile(k)
 	case "INCLUDE":
-		return d.parseInclude(k)
+		return d.parseInclude(k, i)
 	case "LINK":
 		if parts := strings.SplitN(k.Value, " ", 2); len(parts) == 2 {
 			d.Links[parts[0]] = parts[1]
@@ -103,9 +107,9 @@ func (d *Document) parseNodeWithName(k Keyword, i int, stop stopFn) (int, Node) 
 func (d *Document) parseAffiliated(i int, stop stopFn) (int, Node) {
 	start, meta := i, Metadata{}
 	for ; !stop(d, i) && d.tokens[i].kind == "keyword"; i++ {
-		switch k := parseKeyword(d.tokens[i]); k.Key {
+		switch k := parseKeyword(d.tokens[i], i); k.Key {
 		case "CAPTION":
-			meta.Caption = append(meta.Caption, d.parseInline(k.Value))
+			meta.Caption = append(meta.Caption, d.parseInline(k.Value, i))
 		case "ATTR_HTML":
 			attributes, rest := []string{}, k.Value
 			for {
@@ -139,12 +143,13 @@ func (d *Document) parseAffiliated(i int, stop stopFn) (int, Node) {
 	return i - start, NodeWithMeta{node, meta}
 }
 
-func parseKeyword(t token) Keyword {
+func parseKeyword(t token, ni int) Keyword {
 	k, v := t.matches[2], t.matches[4]
-	return Keyword{strings.ToUpper(k), strings.TrimSpace(v)}
+	return Keyword{t.pos, strings.ToUpper(k), strings.TrimSpace(v)}
 }
 
-func (d *Document) parseInclude(k Keyword) (int, Node) {
+// TODO: This will break the token stream positions in the file!
+func (d *Document) parseInclude(k Keyword, ni int) (int, Node) {
 	resolve := func() Node {
 		d.Log.Printf("Bad include %#v", k)
 		return k
@@ -160,7 +165,7 @@ func (d *Document) parseInclude(k Keyword) (int, Node) {
 				d.Log.Printf("Bad include %#v: %s", k, err)
 				return k
 			}
-			return Block{strings.ToUpper(kind), []string{lang}, d.parseRawInline(string(bs)), nil}
+			return Block{strings.ToUpper(kind), k.Pos, []string{lang}, d.parseRawInline(string(bs), ni), nil}
 		}
 	}
 	return 1, Include{k, resolve}
@@ -192,3 +197,9 @@ func (n Keyword) String() string      { return orgWriter.WriteNodesAsString(n) }
 func (n NodeWithMeta) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n NodeWithName) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n Include) String() string      { return orgWriter.WriteNodesAsString(n) }
+
+func (n Include) GetPos() Pos      { return n.Keyword.GetPos() }
+func (n NodeWithName) GetPos() Pos { return n.Node.GetPos() }
+func (n NodeWithMeta) GetPos() Pos { return n.Node.GetPos() }
+func (n Comment) GetPos() Pos      { return n.Pos }
+func (n Keyword) GetPos() Pos      { return n.Pos }

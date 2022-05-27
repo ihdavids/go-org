@@ -9,6 +9,7 @@ import (
 
 type List struct {
 	Kind  string
+	Pos   Pos
 	Items []Node
 }
 
@@ -16,12 +17,14 @@ type ListItem struct {
 	Bullet   string
 	Status   string
 	Value    string
+	Pos      Pos
 	Children []Node
 }
 
 type DescriptiveListItem struct {
 	Bullet  string
 	Status  string
+	Pos     Pos
 	Term    []Node
 	Details []Node
 }
@@ -32,11 +35,11 @@ var descriptiveListItemRegexp = regexp.MustCompile(`\s::(\s|$)`)
 var listItemValueRegexp = regexp.MustCompile(`\[@(\d+)\]\s`)
 var listItemStatusRegexp = regexp.MustCompile(`\[( |X|-)\]\s`)
 
-func lexList(line string) (token, bool) {
+func lexList(line string, row, col int) (token, bool) {
 	if m := unorderedListRegexp.FindStringSubmatch(line); m != nil {
-		return token{"unorderedList", len(m[1]), m[4], m}, true
+		return token{"unorderedList", len(m[1]), m[4], m, Pos{row, col}}, true
 	} else if m := orderedListRegexp.FindStringSubmatch(line); m != nil {
-		return token{"orderedList", len(m[1]), m[5], m}, true
+		return token{"orderedList", len(m[1]), m[5], m, Pos{row, col}}, true
 	}
 	return nilToken, false
 }
@@ -64,7 +67,7 @@ func listKind(t token) (string, string) {
 func (d *Document) parseList(i int, parentStop stopFn) (int, Node) {
 	start, lvl := i, d.tokens[i].lvl
 	listMainKind, kind := listKind(d.tokens[i])
-	list := List{Kind: kind}
+	list := List{Kind: kind, Pos: (d.tokens[start].Pos())}
 	stop := func(*Document, int) bool {
 		if parentStop(d, i) || d.tokens[i].lvl != lvl || !isListToken(d.tokens[i]) {
 			return true
@@ -98,7 +101,7 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	d.tokens[i] = tokenize(strings.Repeat(" ", minIndent) + content)
+	d.tokens[i] = tokenize(strings.Repeat(" ", minIndent)+content, d.tokens[i].Pos().Row)
 	stop := func(d *Document, i int) bool {
 		if parentStop(d, i) {
 			return true
@@ -113,11 +116,14 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 	}
 	d.baseLvl = originalBaseLvl
 	if l.Kind == "descriptive" {
-		return i - start, DescriptiveListItem{bullet, status, d.parseInline(dterm), nodes}
+		return i - start, DescriptiveListItem{bullet, status, d.tokens[i].Pos(), d.parseInline(dterm, i), nodes}
 	}
-	return i - start, ListItem{bullet, status, value, nodes}
+	return i - start, ListItem{bullet, status, value, d.tokens[i].Pos(), nodes}
 }
 
 func (n List) String() string                { return orgWriter.WriteNodesAsString(n) }
 func (n ListItem) String() string            { return orgWriter.WriteNodesAsString(n) }
 func (n DescriptiveListItem) String() string { return orgWriter.WriteNodesAsString(n) }
+func (self DescriptiveListItem) GetPos() Pos { return self.Pos }
+func (self ListItem) GetPos() Pos            { return self.Pos }
+func (self List) GetPos() Pos                { return self.Pos }
