@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime/debug"
 	"strings"
 )
 
@@ -139,6 +140,7 @@ func (c *Configuration) Parse(input io.Reader, path string) (d *Document) {
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
+			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
 			d.Error = fmt.Errorf("could not parse input: %v", recovered)
 		}
 	}()

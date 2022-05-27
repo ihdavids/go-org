@@ -61,14 +61,14 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[i].Pos()}
+	table := Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos()}
 	for _, rawColumns := range rawRows {
 		row := Row{nil, isSpecialRow(rawColumns)}
 		if len(rawColumns) != 0 {
 			for i := range table.ColumnInfos {
 				column := Column{nil, &table.ColumnInfos[i]}
 				if i < len(rawColumns) {
-					column.Children = d.parseInline(rawColumns[i], i) // TODO: This is off by the row index
+					column.Children = d.parseInline(rawColumns[i], start) // TODO: This is off by the row index
 				}
 				row.Columns = append(row.Columns, column)
 			}

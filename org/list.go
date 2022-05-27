@@ -116,9 +116,9 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 	}
 	d.baseLvl = originalBaseLvl
 	if l.Kind == "descriptive" {
-		return i - start, DescriptiveListItem{bullet, status, d.tokens[i].Pos(), d.parseInline(dterm, i), nodes}
+		return i - start, DescriptiveListItem{bullet, status, d.tokens[start].Pos(), d.parseInline(dterm, i), nodes}
 	}
-	return i - start, ListItem{bullet, status, value, d.tokens[i].Pos(), nodes}
+	return i - start, ListItem{bullet, status, value, d.tokens[start].Pos(), nodes}
 }
 
 func (n List) String() string                { return orgWriter.WriteNodesAsString(n) }

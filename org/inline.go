@@ -238,7 +238,7 @@ func (d *Document) parseLatexFragment(input string, start int, pairLength int, n
 	openingPair := input[start : start+pairLength]
 	closingPair := latexFragmentPairs[openingPair]
 	if i := strings.Index(input[start+pairLength:], closingPair); i != -1 {
-		content := d.parseRawInline(input[start+pairLength:start+pairLength+i], i)
+		content := d.parseRawInline(input[start+pairLength:start+pairLength+i], ni)
 		return i + pairLength + pairLength, LatexFragment{Pos{d.tokens[ni].Pos().Row, start}, openingPair, closingPair, content}
 	}
 	return 0, nil

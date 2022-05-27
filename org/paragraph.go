@@ -41,7 +41,7 @@ func (d *Document) parseParagraph(i int, parentStop stopFn) (int, Node) {
 		lines = append(lines, strings.Repeat(" ", int(lvl))+d.tokens[i].content)
 	}
 	consumed := i - start
-	return consumed, Paragraph{d.tokens[start].Pos(), d.parseInline(strings.Join(lines, "\n"), i)}
+	return consumed, Paragraph{d.tokens[start].Pos(), d.parseInline(strings.Join(lines, "\n"), start)}
 }
 
 func (d *Document) parseHorizontalRule(i int, parentStop stopFn) (int, Node) {
