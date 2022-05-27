@@ -34,16 +34,17 @@ type Configuration struct {
 // Document contains the parsing results and a pointer to the Configuration.
 type Document struct {
 	*Configuration
-	Path           string // Path of the file containing the parse input - used to resolve relative paths during parsing (e.g. INCLUDE).
-	tokens         []token
-	baseLvl        int
-	Macros         map[string]string
-	Links          map[string]string
-	Nodes          []Node
-	NamedNodes     map[string]Node
-	Outline        Outline           // Outline is a Table Of Contents for the document and contains all sections (headline + content).
-	BufferSettings map[string]string // Settings contains all settings that were parsed from keywords.
-	Error          error
+	Path            string // Path of the file containing the parse input - used to resolve relative paths during parsing (e.g. INCLUDE).
+	tokens          []token
+	baseLvl         int
+	Macros          map[string]string
+	Links           map[string]string
+	Nodes           []Node
+	NamedNodes      map[string]Node
+	Outline         Outline           // Outline is a Table Of Contents for the document and contains all sections (headline + content).
+	BufferSettings  map[string]string // Settings contains all settings that were parsed from keywords.
+	Error           error
+	currentHeadline *Headline
 }
 
 // Node represents a parsed node of the document.
@@ -84,6 +85,9 @@ var lexFns = []lexFn{
 	lexFootnoteDefinition,
 	lexExample,
 	lexText,
+	lexScheduled,
+	lexDeadline,
+	lexClosed,
 }
 
 var nilToken = token{"nil", -1, "", nil, Pos{0, 0}}
@@ -239,6 +243,12 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 		consumed, node = d.parseKeyword(i, stop)
 	case "headline":
 		consumed, node = d.parseHeadline(i, stop)
+	case "deadline":
+		consumed, node = d.parseDeadline(i, stop)
+	case "scheduled":
+		consumed, node = d.parseScheduled(i, stop)
+	case "closed":
+		consumed, node = d.parseClosed(i, stop)
 	case "footnoteDefinition":
 		consumed, node = d.parseFootnoteDefinition(i, stop)
 	}

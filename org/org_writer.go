@@ -158,6 +158,22 @@ func (w *OrgWriter) WriteFootnoteDefinition(f FootnoteDefinition) {
 	w.WriteString(content)
 }
 
+func (w *OrgWriter) WriteSDC(s SDC) {
+	name := ""
+	switch s.DateType {
+	case Scheduled:
+		name = "SCHEDULED"
+		break
+	case Deadline:
+		name = "DEADLINE"
+		break
+	case Closed:
+		name = "CLOSED"
+		break
+	}
+	w.WriteString(fmt.Sprintf("%s: %s\n", name, s.Date.ToString()))
+}
+
 func (w *OrgWriter) WriteParagraph(p Paragraph) {
 	content := w.WriteNodesAsString(p.Children...)
 	if len(content) > 0 && content[0] != '\n' {

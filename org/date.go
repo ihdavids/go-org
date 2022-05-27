@@ -71,16 +71,16 @@ import (
     ('month', '10'), ('year', '2005')]
    """
 */
-func GenTimestampRegex(brtype string, prefix string, nocookie bool) string {
+func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) string {
 	bo, bc := "", ""
-	if brtype == "active" {
+	if brtype == Active {
 		bo, bc = `\<`, `\>`
-	} else if brtype == "inactive" {
+	} else if brtype == Inactive {
 		bo, bc = `\[`, `\]`
 	}
 
 	var ignore = ""
-	if brtype == "nobrace" {
+	if brtype == NoBracket {
 		ignore = `[\s\w]`
 	} else {
 		ignore = fmt.Sprintf(`[^%s]`, bc)
@@ -97,7 +97,7 @@ func GenTimestampRegex(brtype string, prefix string, nocookie bool) string {
 	var regex_cookie = `(({ignore}+?)(?P<{{.prefix}}repeatpre> *[\.\+]{1,2})(?P<{{.prefix}}repeatnum> *\d+)(?P<{{.prefix}}repeatdwmy> *[dwmy]))?(({{.ignore}}+?)(?P<{{.prefix}}warnpre> *\-)(?P<{{.prefix}}warnnum> *\d+)(?P<{{.prefix}}warndwmy> *[dwmy]))?`
 
 	// http://www.pythonregex.com/
-	if !(nocookie || brtype != "nobrace") {
+	if !(nocookie || brtype != NoBracket) {
 		regex_cookie = ""
 	}
 	var mm = map[string]interface{}{
@@ -109,25 +109,25 @@ func GenTimestampRegex(brtype string, prefix string, nocookie bool) string {
 }
 
 type DateParser struct {
-	Re     regexp.Regexp
-	Active bool
+	Re            regexp.Regexp
+	TimestampType TimestampType
 }
 
 func CompileSDCRe(sdctype string) *DateParser {
-	var brtype = "active"
+	var brtype = Active
 	if sdctype == "CLOSED" {
-		brtype = "inactive"
+		brtype = Inactive
 	}
 	var mm = map[string]interface{}{
 		"sdctype": sdctype,
 		"timere":  GenTimestampRegex(brtype, "", true),
 	}
-	var tmpl string = `^[^#]*{{.sdctype}}:\s+{{.timere}}`
+	var tmpl string = `^([^#]*){{.sdctype}}:\s+{{.timere}}`
 	tmp, err := AString(tmpl).Format(mm)
 	if err == nil {
 		var dp *DateParser = new(DateParser)
 		dp.Re = *regexp.MustCompile(tmp)
-		dp.Active = brtype == "active"
+		dp.TimestampType = brtype
 		return dp
 	}
 	return nil
@@ -193,17 +193,37 @@ func orgDateFromTuple(tpl []string) time.Time {
 	}
 }
 
+type DateType int
+
+const (
+	NilDate DateType = iota
+	Scheduled
+	Deadline
+	Closed
+	TimeStamp
+)
+
+type TimestampType int
+
+const (
+	Active TimestampType = iota
+	Inactive
+	NoBracket
+)
+
 type OrgDate struct {
-	Start      time.Time
-	End        time.Time
-	Active     bool
-	HaveTime   bool
+	Start         time.Time
+	End           time.Time
+	TimestampType TimestampType
+	HaveTime      bool
+
 	RepeatRule *rrule.RRule
 	RepeatPre  string
 	RepeatDWMY string
-	WarnRule   *rrule.RRule
-	WarnPre    string
-	WarnDWMY   string
+
+	WarnRule *rrule.RRule
+	WarnPre  string
+	WarnDWMY string
 	/*
 	   self._start = self._to_date(start)
 	   self._end = self._to_date(end)
@@ -213,11 +233,11 @@ type OrgDate struct {
 	*/
 }
 
-func NewOrgDateFromTuple(start, end []string, active bool) *OrgDate {
+func NewOrgDateFromTuple(start, end []string, ttype TimestampType) *OrgDate {
 	d := new(OrgDate)
 	d.Start = orgDateFromTuple(start)
 	d.End = orgDateFromTuple(end)
-	d.Active = active
+	d.TimestampType = ttype
 	return d
 }
 
@@ -225,7 +245,7 @@ func (self *DateParser) Parse(line string) *OrgDate {
 	match := MatchIRegEx(&self.Re, line)
 	if match != nil {
 		start, end, haveTime := DateRangeFromGroupDict(match, "")
-		orgDate := NewOrgDateFromTuple(start, end, self.Active)
+		orgDate := NewOrgDateFromTuple(start, end, self.TimestampType)
 		orgDate.HaveTime = haveTime
 		repeatpre, rpok := match["repeatpre"]
 		repeatnum, rnok := match["repeatnum"]
@@ -306,15 +326,36 @@ func (self *DateParser) Parse(line string) *OrgDate {
 	return nil
 }
 
-func ParseSDC(line string) *OrgDate {
-	d := OrgDateScheduled.Parse(line)
+func lexDeadline(line string, row, col int) (token, bool) {
+	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
+		return token{"deadline", len(m[1]), line, m, Pos{row, col}}, true
+	}
+	return nilToken, false
+}
+
+func lexScheduled(line string, row, col int) (token, bool) {
+	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
+		return token{"scheduled", len(m[1]), line, m, Pos{row, col}}, true
+	}
+	return nilToken, false
+}
+
+func lexClosed(line string, row, col int) (token, bool) {
+	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
+		return token{"closed", len(m[1]), line, m, Pos{row, col}}, true
+	}
+	return nilToken, false
+}
+
+func ParseSDC(line string) (*OrgDate, DateType) {
+	d, dt := OrgDateScheduled.Parse(line), Scheduled
 	if d == nil {
-		d = OrgDateDeadline.Parse(line)
+		d, dt = OrgDateDeadline.Parse(line), Deadline
 	}
 	if d == nil {
-		d = OrgDateClosed.Parse(line)
+		d, dt = OrgDateClosed.Parse(line), Closed
 	}
-	return d
+	return d, dt
 }
 
 func (self *OrgDate) After(date time.Time) bool {
@@ -343,10 +384,35 @@ func (self *OrgDate) ToDate() string {
 		end = " -- " + self.End.Format("2006-01-02 Mon")
 	}
 	bs, be := "", ""
-	if self.Active {
+	switch self.TimestampType {
+	case Active:
 		bs, be = "<", ">"
+		break
+	case Inactive:
+		bs, be = "[", "]"
+		break
 	}
 	return bs + self.Start.Format("2006-01-02 Mon") + end + be
+}
+
+func (self *OrgDate) ToString() string {
+	if !self.HasTime() {
+		return self.ToDate()
+	}
+	end := ""
+	if !self.End.IsZero() {
+		end = " -- " + self.End.Format("2006-01-02 Mon 15:04")
+	}
+	bs, be := "", ""
+	switch self.TimestampType {
+	case Active:
+		bs, be = "<", ">"
+		break
+	case Inactive:
+		bs, be = "[", "]"
+		break
+	}
+	return bs + self.Start.Format("2006-01-02 Mon 15:04") + end + be
 }
 
 func (self *OrgDate) HasOverlap(other *OrgDate) bool {

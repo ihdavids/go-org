@@ -83,7 +83,27 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 	headline.Children = nodes
+	d.currentHeadline = &headline
 	return consumed + 1, headline
+}
+
+type SDC struct {
+	Pos      Pos
+	Date     *OrgDate
+	DateType DateType
+}
+
+func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
+	s, dt := ParseSDC(d.tokens[i].content)
+	return 1, SDC{d.tokens[i].Pos(), s, dt}
+}
+func (d *Document) parseDeadline(i int, parentStop stopFn) (int, Node) {
+	s, dt := ParseSDC(d.tokens[i].content)
+	return 1, SDC{d.tokens[i].Pos(), s, dt}
+}
+func (d *Document) parseClosed(i int, parentStop stopFn) (int, Node) {
+	s, dt := ParseSDC(d.tokens[i].content)
+	return 1, SDC{d.tokens[i].Pos(), s, dt}
 }
 
 func trimFastTags(tags []string) []string {
@@ -130,3 +150,5 @@ func (parent *Section) add(current *Section) {
 
 func (n Headline) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n Headline) GetPos() Pos    { return n.Pos }
+func (n SDC) String() string      { return orgWriter.WriteNodesAsString(n) }
+func (n SDC) GetPos() Pos         { return n.Pos }

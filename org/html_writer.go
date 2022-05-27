@@ -347,6 +347,37 @@ func (w *HTMLWriter) WriteTimestamp(t Timestamp) {
 	w.WriteString(`&gt;</span>`)
 }
 
+func (w *HTMLWriter) WriteSDC(s SDC) {
+	if w.document.GetOption("<") == "nil" {
+		return
+	}
+	name := ""
+	switch s.DateType {
+	case Scheduled:
+		name = "SCHEDULED"
+		break
+	case Deadline:
+		name = "DEADLINE"
+		break
+	case Closed:
+		name = "CLOSED"
+		break
+	}
+	w.WriteString(fmt.Sprintf(`<span class="tags">%s`, name))
+	w.WriteString(`</span>`)
+	bs, be := "", ""
+	if s.Date.TimestampType == Active {
+		bs, be = "&lt;", "&gt;"
+	} else if s.Date.TimestampType == Inactive {
+		bs, be = "&lsqb;", "&rsqb;"
+	}
+	w.WriteString(fmt.Sprintf(`<span class="timestamp">%s`, bs))
+	dt := s.Date
+	dt.TimestampType = NoBracket
+	w.WriteString(fmt.Sprintf("%s", dt.ToString()))
+	w.WriteString(fmt.Sprintf(`%s</span>`, be))
+}
+
 func (w *HTMLWriter) WriteRegularLink(l RegularLink) {
 	url := html.EscapeString(l.URL)
 	if l.Protocol == "file" {
