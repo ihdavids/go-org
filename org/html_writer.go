@@ -335,16 +335,25 @@ func (w *HTMLWriter) WriteTimestamp(t Timestamp) {
 	if w.document.GetOption("<") == "nil" {
 		return
 	}
-	w.WriteString(`<span class="timestamp">&lt;`)
-	if t.IsDate {
-		w.WriteString(t.Time.Format(datestampFormat))
-	} else {
-		w.WriteString(t.Time.Format(timestampFormat))
+	w.WriteString(`<span class="timestamp">`)
+	bs, be := "", ""
+	if t.Time.TimestampType == Active {
+		bs, be = "&lt;", "&gt;"
+	} else if t.Time.TimestampType == Inactive {
+		bs, be = "&lsqb;", "&rsqb;"
 	}
-	if t.Interval != "" {
-		w.WriteString(" " + t.Interval)
-	}
-	w.WriteString(`&gt;</span>`)
+	var od OrgDate = *t.Time
+	od.TimestampType = NoBracket
+	w.WriteString(fmt.Sprintf("%s%s%s</span>", bs, od.ToString(), be))
+	/*
+		if t.IsDate {
+			w.WriteString(t.Time.Format(datestampFormat))
+		} else {
+			w.WriteString(t.Time.Format(timestampFormat))
+		}
+		if t.Interval != "" {
+			w.WriteString(" " + t.Interval)
+		}*/
 }
 
 func (w *HTMLWriter) WriteSDC(s SDC) {

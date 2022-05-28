@@ -133,9 +133,20 @@ func CompileSDCRe(sdctype string) *DateParser {
 	return nil
 }
 
+func CompileDateRe(ttype TimestampType) *DateParser {
+	var brtype = ttype
+	var tmpl string = GenTimestampRegex(brtype, "", true)
+	var dp *DateParser = new(DateParser)
+	dp.Re = *regexp.MustCompile(tmpl)
+	dp.TimestampType = brtype
+	return dp
+}
+
 var OrgDateScheduled = CompileSDCRe("SCHEDULED")
 var OrgDateDeadline = CompileSDCRe("DEADLINE")
 var OrgDateClosed = CompileSDCRe("CLOSED")
+var OrgDateActive = CompileDateRe(Active)
+var OrgDateInactive = CompileDateRe(Inactive)
 
 //    def _datetuple_from_groupdict(cls, dct, prefix=''):
 //        return cls._daterange_from_groupdict(dct, prefix=prefix)[0]
@@ -148,19 +159,31 @@ func DateRangeFromGroupDict(dct IRegEx, prefix string) ([]string, []string, bool
 	for _, x := range start_keys {
 		key := prefix + x
 		if v, ok := dct[key]; ok {
-			start_range = append(start_range, v)
+			v = strings.TrimSpace(v)
+			if len(v) > 0 {
+				start_range = append(start_range, v)
+			} else {
+				break
+			}
 		}
 	}
 	for _, x := range end_keys {
 		key := prefix + x
 		if v, ok := dct[key]; ok {
-			start_range = append(start_range, v)
+			v = strings.TrimSpace(v)
+			if len(v) > 0 {
+				end_range = append(end_range, v)
+			} else {
+				break
+			}
 		}
 	}
+	fmt.Println("GGGGGG: ", start_range)
+	fmt.Println(dct)
 	if len(end_range) < len(end_keys) {
 		end_range = nil
 	}
-	return start_range, end_range, len(start_range) < len(start_keys)
+	return start_range, end_range, len(start_range) == len(start_keys)
 }
 
 func orgDateFromTuple(tpl []string) time.Time {
@@ -200,7 +223,8 @@ const (
 	Scheduled
 	Deadline
 	Closed
-	TimeStamp
+	ActiveTimeStamp
+	InactiveTimestamp
 )
 
 type TimestampType int
@@ -241,7 +265,7 @@ func NewOrgDateFromTuple(start, end []string, ttype TimestampType) *OrgDate {
 	return d
 }
 
-func (self *DateParser) Parse(line string) *OrgDate {
+func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 	match := MatchIRegEx(&self.Re, line)
 	if match != nil {
 		start, end, haveTime := DateRangeFromGroupDict(match, "")
@@ -321,9 +345,9 @@ func (self *DateParser) Parse(line string) *OrgDate {
 			orgDate.WarnPre = warnpre
 			orgDate.WarnDWMY = warndwmy
 		}
-		return orgDate
+		return orgDate, match
 	}
-	return nil
+	return nil, nil
 }
 
 func lexDeadline(line string, row, col int) (token, bool) {
@@ -348,14 +372,34 @@ func lexClosed(line string, row, col int) (token, bool) {
 }
 
 func ParseSDC(line string) (*OrgDate, DateType) {
-	d, dt := OrgDateScheduled.Parse(line), Scheduled
+	d, _ := OrgDateScheduled.Parse(line)
+	dt := Scheduled
 	if d == nil {
-		d, dt = OrgDateDeadline.Parse(line), Deadline
+		d, _ = OrgDateDeadline.Parse(line)
+		dt = Deadline
 	}
 	if d == nil {
-		d, dt = OrgDateClosed.Parse(line), Closed
+		d, _ = OrgDateClosed.Parse(line)
+		dt = Closed
+	}
+	if d == nil {
+		dt = NilDate
 	}
 	return d, dt
+}
+
+func ParseTimestamp(line string) (*OrgDate, DateType, IRegEx) {
+	d, m := OrgDateActive.Parse(line)
+	dt := ActiveTimeStamp
+	if d == nil {
+		d, m = OrgDateInactive.Parse(line)
+		dt = InactiveTimestamp
+	}
+	if d == nil {
+		dt = NilDate
+		m = nil
+	}
+	return d, dt, m
 }
 
 func (self *OrgDate) After(date time.Time) bool {
@@ -397,6 +441,7 @@ func (self *OrgDate) ToDate() string {
 
 func (self *OrgDate) ToString() string {
 	if !self.HasTime() {
+		fmt.Printf("XXXXXX: %s\n", self.Start.String())
 		return self.ToDate()
 	}
 	end := ""
@@ -412,6 +457,7 @@ func (self *OrgDate) ToString() string {
 		bs, be = "[", "]"
 		break
 	}
+	fmt.Printf("SSSSSSS: %s\n", self.Start.String())
 	return bs + self.Start.Format("2006-01-02 Mon 15:04") + end + be
 }
 

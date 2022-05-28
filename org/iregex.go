@@ -36,5 +36,6 @@ func MatchIRegEx(compRegEx *regexp.Regexp, in string) IRegEx {
 			paramsMap[name] = match[i]
 		}
 	}
+	paramsMap["_fullmatch"] = match[0]
 	return paramsMap
 }

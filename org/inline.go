@@ -1,11 +1,9 @@
 package org
 
 import (
-	"fmt"
 	"path"
 	"regexp"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 )
@@ -37,10 +35,13 @@ type StatisticToken struct {
 }
 
 type Timestamp struct {
-	Pos      Pos
-	Time     time.Time
-	IsDate   bool
-	Interval string
+	Pos  Pos
+	Time *OrgDate
+	/*
+		Time     time.Time
+		IsDate   bool
+		Interval string
+	*/
 }
 
 type Emphasis struct {
@@ -353,6 +354,30 @@ func (d *Document) parseRegularLink(input string, start int, ni int) (int, Node)
 }
 
 func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
+	s, _, m := ParseTimestamp(input[start:])
+	if s != nil {
+		timestamp := Timestamp{Pos{d.tokens[ni].Pos().Row, start}, s /*, isDate, interval*/}
+		return len(m["_fullmatch"]), timestamp
+	}
+	/*
+		if m := timestampRegexp.FindStringSubmatch(input[start:]); m != nil {
+			ddmmyy, hhmm, interval, isDate := m[1], m[3], strings.TrimSpace(m[4]), false
+			if hhmm == "" {
+				hhmm, isDate = "00:00", true
+			}
+			t, err := time.Parse(timestampFormat, fmt.Sprintf("%s Mon %s", ddmmyy, hhmm))
+			if err != nil {
+				return 0, nil
+			}
+			timestamp := Timestamp{Pos{d.tokens[ni].Pos().Row, start}, t, isDate, interval}
+			return len(m[0]), timestamp
+		}
+	*/
+	return 0, nil
+}
+
+/*
+func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
 	if m := timestampRegexp.FindStringSubmatch(input[start:]); m != nil {
 		ddmmyy, hhmm, interval, isDate := m[1], m[3], strings.TrimSpace(m[4]), false
 		if hhmm == "" {
@@ -367,6 +392,7 @@ func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
 	}
 	return 0, nil
 }
+*/
 
 func (d *Document) parseEmphasis(input string, start int, isRaw bool, ni int) (int, Node) {
 	marker, i := input[start], start

@@ -5,9 +5,9 @@ import (
 )
 
 func TestDateParse(t *testing.T) {
-	sched := OrgDateScheduled.Parse("SCHEDULED: <2004-12-25 Sat>")
-	badsched := OrgDateScheduled.Parse("DEADLINE: <2004-12-25 Sat>")
-	deadl := OrgDateDeadline.Parse("DEADLINE: <2004-02-29 Sun>")
+	sched, _ := OrgDateScheduled.Parse("SCHEDULED: <2004-12-25 Sat>")
+	badsched, _ := OrgDateScheduled.Parse("DEADLINE: <2004-12-25 Sat>")
+	deadl, _ := OrgDateDeadline.Parse("DEADLINE: <2004-02-29 Sun>")
 	if sched.ToDate() != "<2004-12-25 Sat>" {
 		t.Fatalf("Scheduled did not pass: %s got %q %q", "2004-12-25", sched.Start.String(), sched.End.String())
 	}
