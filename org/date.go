@@ -83,7 +83,8 @@ func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) strin
 	if brtype == NoBracket {
 		ignore = `[\s\w]`
 	} else {
-		ignore = fmt.Sprintf(`[^%s]`, bc)
+		//ignore = `[\s\w]`
+		ignore = fmt.Sprintf(`[^%s+.:0-9-]`, bc)
 	}
 
 	/*
@@ -94,10 +95,10 @@ func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) strin
 
 	var regex_date_time = `(?P<{{.prefix}}year>\d{4}) *\- *(?P<{{.prefix}}month>\d{2}) *\- *(?P<{{.prefix}}day>\d{2}) *(({{.ignore}}+?)(?P<{{.prefix}}hour>\d{2}) *: *(?P<{{.prefix}}min>\d{2})( *\-\-? *(?P<{{.prefix}}end_hour>\d{2}) : *(?P<{{.prefix}}end_min>\d{2}))?)?`
 
-	var regex_cookie = `(({ignore}+?)(?P<{{.prefix}}repeatpre> *[\.\+]{1,2})(?P<{{.prefix}}repeatnum> *\d+)(?P<{{.prefix}}repeatdwmy> *[dwmy]))?(({{.ignore}}+?)(?P<{{.prefix}}warnpre> *\-)(?P<{{.prefix}}warnnum> *\d+)(?P<{{.prefix}}warndwmy> *[dwmy]))?`
+	var regex_cookie = `((?P<{{.prefix}}repeatpre> *[.+]{1,2})(?P<{{.prefix}}repeatnum> *\d+)(?P<{{.prefix}}repeatdwmy> *[dwmy]))?(({{.ignore}}+?)(?P<{{.prefix}}warnpre> *\-)(?P<{{.prefix}}warnnum> *\d+)(?P<{{.prefix}}warndwmy> *[dwmy]))?`
 
 	// http://www.pythonregex.com/
-	if !(nocookie || brtype != NoBracket) {
+	if nocookie || brtype == NoBracket {
 		regex_cookie = ""
 	}
 	var mm = map[string]interface{}{
@@ -458,7 +459,7 @@ func (self *OrgDate) ToString() string {
 		break
 	}
 	fmt.Printf("SSSSSSS: %s\n", self.Start.String())
-	return bs + self.Start.Format("2006-01-02 Mon 15:04") + end + be
+	return bs + self.Start.Format("2006-01-02 Mon 15:04") + self.RepeatPre + self.RepeatDWMY + self.WarnPre + self.WarnDWMY + end + be
 }
 
 func (self *OrgDate) HasOverlap(other *OrgDate) bool {
