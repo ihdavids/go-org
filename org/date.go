@@ -180,8 +180,6 @@ func DateRangeFromGroupDict(dct IRegEx, prefix string) ([]string, []string, bool
 			}
 		}
 	}
-	fmt.Println("GGGGGG: ", start_range)
-	fmt.Println(dct)
 	if len(end_range) < len(end_keys) {
 		end_range = nil
 	}
@@ -469,7 +467,6 @@ func (self *OrgDate) ToDate() string {
 
 func (self *OrgDate) ToString() string {
 	if !self.HasTime() {
-		fmt.Printf("XXXXXX: %s\n", self.Start.String())
 		return self.ToDate()
 	}
 	end := ""
@@ -485,7 +482,6 @@ func (self *OrgDate) ToString() string {
 		bs, be = "[", "]"
 		break
 	}
-	fmt.Printf("SSSSSSS: %s\n", self.Start.String())
 	var intNum string = ""
 	if self.RepeatRule != nil && self.RepeatDWMY != "" {
 		intNum = fmt.Sprintf("%d", self.RepeatRule.Options.Interval)

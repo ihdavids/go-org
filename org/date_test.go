@@ -81,7 +81,7 @@ func TestTimestamps(t *testing.T) {
 		t.Fatalf("Timestamp did not match: <2004-1-25 Sun 5:45 +1d> got: %s", strTime)
 	}
 	s, dt, _ = ParseTimestamp("<2004-1-25 5:45 +1d>")
-	if s == nil || dt != ActiveTimeStamp || s.ToDate() != "<2004-01-25 Sun 05:45 +1d>" {
+	if s == nil || dt != ActiveTimeStamp || s.ToString() != "<2004-01-25 Sun 05:45 +1d>" {
 		strTime := ""
 		if s != nil {
 			strTime = s.ToString()
