@@ -27,10 +27,10 @@ type Headline struct {
 	Priority   string
 	Properties *PropertyDrawer
 	// Scheduling timestamps
-	Scheduled SDC
-	Closed    SDC
-	Deadline  SDC
-	Timestamp Timestamp
+	Scheduled *SDC
+	Closed    *SDC
+	Deadline  *SDC
+	Timestamp *Timestamp
 	Title     []Node
 	Tags      []string
 	Children  []Node
@@ -102,7 +102,7 @@ func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
 	sdc := SDC{d.tokens[i].Pos(), s, dt}
 	if d.Outline.last != nil && d.Outline.last.Headline != nil {
-		d.Outline.last.Headline.Scheduled = sdc
+		d.Outline.last.Headline.Scheduled = &sdc
 	}
 	return 1, sdc
 }
@@ -110,7 +110,7 @@ func (d *Document) parseDeadline(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
 	sdc := SDC{d.tokens[i].Pos(), s, dt}
 	if d.Outline.last != nil && d.Outline.last.Headline != nil {
-		d.Outline.last.Headline.Deadline = sdc
+		d.Outline.last.Headline.Deadline = &sdc
 	}
 	return 1, sdc
 }
@@ -118,7 +118,7 @@ func (d *Document) parseClosed(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
 	sdc := SDC{d.tokens[i].Pos(), s, dt}
 	if d.Outline.last != nil && d.Outline.last.Headline != nil {
-		d.Outline.last.Headline.Closed = sdc
+		d.Outline.last.Headline.Closed = &sdc
 	}
 	return 1, sdc
 }
@@ -143,6 +143,22 @@ func (h Headline) ID() string {
 		return customID
 	}
 	return fmt.Sprintf("headline-%d", h.Index)
+}
+
+func (h Headline) HasDeadline() bool {
+	return h.Deadline != nil
+}
+
+func (h Headline) HasScheduled() bool {
+	return h.Scheduled != nil
+}
+
+func (h Headline) HasClosed() bool {
+	return h.Closed != nil
+}
+
+func (h Headline) HasTimestamp() bool {
+	return h.Timestamp != nil
 }
 
 func (h Headline) IsExcluded(d *Document) bool {

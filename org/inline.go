@@ -358,7 +358,7 @@ func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
 	if s != nil {
 		timestamp := Timestamp{Pos{d.tokens[ni].Pos().Row, start}, s /*, isDate, interval*/}
 		if d.Outline.last != nil && d.Outline.last.Headline != nil {
-			d.Outline.last.Headline.Timestamp = timestamp
+			d.Outline.last.Headline.Timestamp = &timestamp
 		}
 		return len(m["_fullmatch"]), timestamp
 	}

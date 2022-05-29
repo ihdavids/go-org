@@ -465,6 +465,10 @@ func (self *OrgDate) ToDate() string {
 	return bs + self.Start.Format("2006-01-02 Mon") + end + be
 }
 
+func (self *OrgDate) IsZero() bool {
+	return self.Start.IsZero()
+}
+
 func (self *OrgDate) ToString() string {
 	if !self.HasTime() {
 		return self.ToDate()
