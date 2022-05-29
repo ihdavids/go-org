@@ -84,7 +84,8 @@ func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) strin
 		ignore = `[\s\w]`
 	} else {
 		//ignore = `[\s\w]`
-		ignore = fmt.Sprintf(`[^%s+.:0-9-]`, bc)
+		//ignore = fmt.Sprintf(`[^%s+.:0-9-]`, bc)
+		ignore = `[^>+:0-9-]`
 	}
 
 	/*
@@ -93,7 +94,7 @@ func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) strin
 		}
 	*/
 
-	var regex_date_time = `(?P<{{.prefix}}year>\d{4}) *\- *(?P<{{.prefix}}month>\d{2}) *\- *(?P<{{.prefix}}day>\d{2}) *(({{.ignore}}+?)(?P<{{.prefix}}hour>\d{2}) *: *(?P<{{.prefix}}min>\d{2})( *\-\-? *(?P<{{.prefix}}end_hour>\d{2}) : *(?P<{{.prefix}}end_min>\d{2}))?)?`
+	var regex_date_time = `(?P<{{.prefix}}year>\d{4}) *\- *(?P<{{.prefix}}month>\d{1,2}) *\- *(?P<{{.prefix}}day>\d{1,2}) *(?P<{{.prefix}}weekday>[A-Za-z]{3})? *((?P<{{.prefix}}hour>\d{1,2}) *: *(?P<{{.prefix}}min>\d{2})( *\-\-? *(?P<{{.prefix}}end_hour>\d{1,2}) *: *(?P<{{.prefix}}end_min>\d{2}))?)?`
 
 	var regex_cookie = `((?P<{{.prefix}}repeatpre> *[.+]{1,2})(?P<{{.prefix}}repeatnum> *\d+)(?P<{{.prefix}}repeatdwmy> *[dwmy]))?(({{.ignore}}+?)(?P<{{.prefix}}warnpre> *\-)(?P<{{.prefix}}warnnum> *\d+)(?P<{{.prefix}}warndwmy> *[dwmy]))?`
 
@@ -105,7 +106,7 @@ func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) strin
 		"prefix": prefix,
 		"ignore": ignore,
 	}
-	restr, _ := AString(strings.Join([]string{bo, regex_date_time, regex_cookie, "({{.ignore}}*?)", bc}, "")).Format(mm)
+	restr, _ := AString(strings.Join([]string{bo, regex_date_time, regex_cookie, "({{.ignore}}*)", bc}, "")).Format(mm)
 	return restr
 }
 
@@ -136,7 +137,7 @@ func CompileSDCRe(sdctype string) *DateParser {
 
 func CompileDateRe(ttype TimestampType) *DateParser {
 	var brtype = ttype
-	var tmpl string = GenTimestampRegex(brtype, "", true)
+	var tmpl string = GenTimestampRegex(brtype, "", false)
 	var dp *DateParser = new(DateParser)
 	dp.Re = *regexp.MustCompile(tmpl)
 	dp.TimestampType = brtype
@@ -275,21 +276,34 @@ func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 		repeatpre, rpok := match["repeatpre"]
 		repeatnum, rnok := match["repeatnum"]
 		repeatdwmy, rdok := match["repeatdwmy"]
-		if rdok && rpok && rnok {
+		if rdok && rpok && rnok && repeatdwmy != "" {
 			freq := rrule.DAILY
-			if repeatdwmy == "y" {
+			var err error
+			switch repeatdwmy {
+			case "y":
 				freq = rrule.YEARLY
-			}
-			if repeatdwmy == "m" {
+				break
+			case "m":
 				freq = rrule.MONTHLY
-			}
-			if repeatdwmy == "w" {
+				break
+			case "w":
 				freq = rrule.WEEKLY
+				break
+			case "d":
+				freq = rrule.DAILY
+				break
+			default:
+				err = fmt.Errorf("Failed to parse repeat rule: %s", repeatdwmy)
+			}
+			if err != nil {
+				return nil, nil
 			}
 			var rnum int = 0
-			var err error
 			if rnum, err = strconv.Atoi(repeatnum); err != nil || rnum <= 0 {
 				rnum = 1
+			}
+			if err != nil {
+				return nil, nil
 			}
 			rr, _ := rrule.NewRRule(rrule.ROption{
 				Freq:     freq,
@@ -312,21 +326,34 @@ func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 		warnpre, wpok := match["warnpre"]
 		warnnum, wnok := match["warnnum"]
 		warndwmy, wdok := match["warndwmy"]
-		if wdok && wpok && wnok {
+		if wdok && wpok && wnok && warndwmy != "" {
 			freq := rrule.DAILY
-			if warndwmy == "y" {
+			var err error
+			switch warndwmy {
+			case "y":
 				freq = rrule.YEARLY
-			}
-			if warndwmy == "m" {
+				break
+			case "m":
 				freq = rrule.MONTHLY
-			}
-			if warndwmy == "w" {
+				break
+			case "w":
 				freq = rrule.WEEKLY
+				break
+			case "d":
+				freq = rrule.DAILY
+				break
+			default:
+				err = fmt.Errorf("Failed to parse warn rule: %s", warndwmy)
+			}
+			if err != nil {
+				return nil, nil
 			}
 			var rnum int = 0
-			var err error
 			if rnum, err = strconv.Atoi(warnnum); err != nil || rnum <= 0 {
 				rnum = 1
+			}
+			if err != nil {
+				return nil, nil
 			}
 			rr, _ := rrule.NewRRule(rrule.ROption{
 				Freq:     freq,
@@ -459,7 +486,15 @@ func (self *OrgDate) ToString() string {
 		break
 	}
 	fmt.Printf("SSSSSSS: %s\n", self.Start.String())
-	return bs + self.Start.Format("2006-01-02 Mon 15:04") + self.RepeatPre + self.RepeatDWMY + self.WarnPre + self.WarnDWMY + end + be
+	var intNum string = ""
+	if self.RepeatRule != nil && self.RepeatDWMY != "" {
+		intNum = fmt.Sprintf("%d", self.RepeatRule.Options.Interval)
+	}
+	var wintNum string = ""
+	if self.WarnRule != nil && self.WarnDWMY != "" {
+		intNum = fmt.Sprintf("%d", self.WarnRule.Options.Interval)
+	}
+	return bs + self.Start.Format("2006-01-02 Mon 15:04") + self.RepeatPre + intNum + self.RepeatDWMY + self.WarnPre + wintNum + self.WarnDWMY + end + be
 }
 
 func (self *OrgDate) HasOverlap(other *OrgDate) bool {

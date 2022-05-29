@@ -39,8 +39,53 @@ func TestParseSDC(t *testing.T) {
 }
 
 func TestTimestamps(t *testing.T) {
-	s, dt, _ := ParseTimestamp("<2004-1-25 Sat>")
-	if dt != ActiveTimeStamp && s.ToDate() != "<2004-1-25 Sat>" {
-		t.Fatalf("Timestamp did not match")
+	// NOTE the single digit
+	s, dt, _ := ParseTimestamp("<2004-1-25 Sun>")
+	if s == nil || dt != ActiveTimeStamp || s.ToDate() != "<2004-01-25 Sun>" {
+		strTime := ""
+		if s != nil {
+			strTime = s.ToDate()
+		}
+		t.Fatalf("Timestamp did not match: <2004-1-25 Sun> got: %s", strTime)
+	}
+	s, dt, _ = ParseTimestamp("<2004-1-25>")
+	if s == nil || dt != ActiveTimeStamp || s.ToDate() != "<2004-01-25 Sun>" {
+		strTime := ""
+		if s != nil {
+			strTime = s.ToDate()
+		}
+		t.Fatalf("Timestamp did not match: <2004-1-25> got: %s", strTime)
+	}
+	s, dt, _ = ParseTimestamp("<2004-1-25 5:45>")
+	if s == nil || dt != ActiveTimeStamp || s.ToString() != "<2004-01-25 Sun 05:45>" {
+		strTime := ""
+		if s != nil {
+			strTime = s.ToString()
+		}
+		t.Fatalf("Timestamp did not match: <2004-1-25 5:45> got: %s", strTime)
+	}
+	s, dt, _ = ParseTimestamp("<2004-1-25 Sun 5:45>")
+	if s == nil || dt != ActiveTimeStamp || s.ToString() != "<2004-01-25 Sun 05:45>" {
+		strTime := ""
+		if s != nil {
+			strTime = s.ToString()
+		}
+		t.Fatalf("Timestamp did not match: <2004-1-25 Sun 5:45> got: %s", strTime)
+	}
+	s, dt, _ = ParseTimestamp("<2004-1-25 Sun 5:45 +1d>")
+	if s == nil || dt != ActiveTimeStamp || s.ToString() != "<2004-01-25 Sun 05:45 +1d>" {
+		strTime := ""
+		if s != nil {
+			strTime = s.ToString()
+		}
+		t.Fatalf("Timestamp did not match: <2004-1-25 Sun 5:45 +1d> got: %s", strTime)
+	}
+	s, dt, _ = ParseTimestamp("<2004-1-25 5:45 +1d>")
+	if s == nil || dt != ActiveTimeStamp || s.ToDate() != "<2004-01-25 Sun 05:45 +1d>" {
+		strTime := ""
+		if s != nil {
+			strTime = s.ToString()
+		}
+		t.Fatalf("Timestamp did not match: <2004-1-25 5:45 +1d> got: %s", strTime)
 	}
 }
