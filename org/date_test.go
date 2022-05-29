@@ -37,3 +37,10 @@ func TestParseSDC(t *testing.T) {
 		t.Logf(deadl.ToDate())
 	}
 }
+
+func TestTimestamps(t *testing.T) {
+	s, dt, _ := ParseTimestamp("<2004-1-25 Sat>")
+	if dt != ActiveTimeStamp && s.ToDate() != "<2004-1-25 Sat>" {
+		t.Fatalf("Timestamp did not match")
+	}
+}
