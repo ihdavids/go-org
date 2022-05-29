@@ -26,10 +26,14 @@ type Headline struct {
 	Status     string
 	Priority   string
 	Properties *PropertyDrawer
-	TimeTag    SDC
-	Title      []Node
-	Tags       []string
-	Children   []Node
+	// Scheduling timestamps
+	Scheduled SDC
+	Closed    SDC
+	Deadline  SDC
+	Timestamp Timestamp
+	Title     []Node
+	Tags      []string
+	Children  []Node
 	// Schedules  []Schedule
 }
 
@@ -97,19 +101,25 @@ type SDC struct {
 func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
 	sdc := SDC{d.tokens[i].Pos(), s, dt}
-	d.Outline.last.Headline.TimeTag = sdc
+	if d.Outline.last != nil && d.Outline.last.Headline != nil {
+		d.Outline.last.Headline.Scheduled = sdc
+	}
 	return 1, sdc
 }
 func (d *Document) parseDeadline(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
 	sdc := SDC{d.tokens[i].Pos(), s, dt}
-	d.Outline.last.Headline.TimeTag = sdc
+	if d.Outline.last != nil && d.Outline.last.Headline != nil {
+		d.Outline.last.Headline.Deadline = sdc
+	}
 	return 1, sdc
 }
 func (d *Document) parseClosed(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
 	sdc := SDC{d.tokens[i].Pos(), s, dt}
-	d.Outline.last.Headline.TimeTag = sdc
+	if d.Outline.last != nil && d.Outline.last.Headline != nil {
+		d.Outline.last.Headline.Closed = sdc
+	}
 	return 1, sdc
 }
 
