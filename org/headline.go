@@ -98,6 +98,10 @@ type SDC struct {
 	DateType DateType
 }
 
+func (self *SDC) IsZero() bool {
+	return self == nil || self.Date == nil || self.Date.IsZero()
+}
+
 func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
 	sdc := SDC{d.tokens[i].Pos(), s, dt}
