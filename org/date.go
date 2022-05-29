@@ -428,6 +428,10 @@ func ParseTimestamp(line string) (*OrgDate, DateType, IRegEx) {
 	return d, dt, m
 }
 
+func (self *OrgDate) OnDay(date time.Time) bool {
+	return self.Start.Day() == date.Day() && self.Start.Year() == date.Year() && self.Start.Month() == date.Month()
+}
+
 func (self *OrgDate) After(date time.Time) bool {
 	return (self.Start.Before(date) || self.Start.Equal(date))
 }
@@ -437,7 +441,7 @@ func (self *OrgDate) Before(date time.Time) bool {
 }
 
 func (self *OrgDate) DateTimeInRange(date time.Time) bool {
-	return (self.Start.Before(date) || self.Start.Equal(date)) && (self.End.After(date) || self.End.Equal(date))
+	return (self.Start.Before(date) || self.Start.Equal(date)) && (self.HasEnd() || (self.End.After(date) || self.End.Equal(date)))
 }
 
 func (self *OrgDate) HasEnd() bool {
