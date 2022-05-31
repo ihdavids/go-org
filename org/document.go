@@ -14,7 +14,9 @@ package org
 
 import (
 	"bufio"
+	"crypto/sha1"
 	"fmt"
+	"hash"
 	"io"
 	"io/ioutil"
 	"log"
@@ -135,13 +137,15 @@ func (c *Configuration) Parse(input io.Reader, path string) (d *Document) {
 	outlineSection := &Section{}
 	d = &Document{
 		Configuration:  c,
-		Outline:        Outline{outlineSection, outlineSection, 0},
+		Outline:        Outline{outlineSection, outlineSection, 0, []hash.Hash{}},
 		BufferSettings: map[string]string{},
 		NamedNodes:     map[string]Node{},
 		Links:          map[string]string{},
 		Macros:         map[string]string{},
 		Path:           path,
 	}
+	d.Outline.lastHash.Push(sha1.New())
+	d.Outline.lastHash.Peek().Write([]byte(path))
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))

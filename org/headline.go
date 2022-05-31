@@ -2,18 +2,39 @@ package org
 
 import (
 	"fmt"
+	"hash"
 	"regexp"
 	"strings"
 	"unicode"
 )
 
+type ShaStack []hash.Hash
+
+func (self *ShaStack) Push(val hash.Hash) {
+	*self = append(*self, val)
+}
+
+func (self *ShaStack) Pop() hash.Hash {
+	n := len(*self) - 1
+	r := (*self)[n]
+	(*self)[n] = nil
+	*self = (*self)[:n]
+	return r
+}
+
+func (self *ShaStack) Peek() hash.Hash {
+	return (*self)[len(*self)-1]
+}
+
 type Outline struct {
 	*Section
-	last  *Section
-	count int
+	last     *Section
+	count    int
+	lastHash ShaStack
 }
 
 type Section struct {
+	Hash     string
 	Headline *Headline
 	Parent   *Section
 	Children []*Section
@@ -77,6 +98,17 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 
 	headline.Title = d.parseInline(text, i)
 
+	// Compute a unique ID for this node based on the document name and headlines in sequence
+	// This ID shouldn't change as long as the structure of the file doesn't change.
+	tHash := d.Outline.lastHash.Peek()
+	var title string
+	for _, n := range headline.Title {
+		title += n.String()
+	}
+	tHash.Write([]byte(title))
+	d.Outline.last.Hash = string(tHash.Sum(nil))
+	d.Outline.lastHash.Push(tHash)
+
 	stop := func(d *Document, i int) bool {
 		return parentStop(d, i) || d.tokens[i].kind == "headline" && len(d.tokens[i].matches[1]) <= headline.Lvl
 	}
@@ -89,6 +121,7 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	}
 	headline.Children = nodes
 	d.currentHeadline = &headline
+	d.Outline.lastHash.Pop()
 	return consumed + 1, headline
 }
 
