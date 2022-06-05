@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	b64 "encoding/base64"
 )
 
 type ShaStack []hash.Hash
@@ -106,7 +107,7 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 		title += n.String()
 	}
 	tHash.Write([]byte(title))
-	d.Outline.last.Hash = string(tHash.Sum(nil))
+	d.Outline.last.Hash = b64.StdEncoding.EncodeToString(tHash.Sum(nil))
 	d.Outline.lastHash.Push(tHash)
 
 	stop := func(d *Document, i int) bool {
