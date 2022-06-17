@@ -14,7 +14,7 @@ type OrgWriter struct {
 	TagsColumn      int
 
 	strings.Builder
-	indent string
+	Indent string
 }
 
 var exampleBlockUnescapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*)(\*|,\*|#\+|,#\+)`)
@@ -76,7 +76,7 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 	}
 	w.WriteString("\n")
 	if len(h.Children) != 0 {
-		w.WriteString(w.indent)
+		w.WriteString(w.Indent)
 	}
 	if h.Properties != nil {
 		WriteNodes(w, *h.Properties)
@@ -85,13 +85,13 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 }
 
 func (w *OrgWriter) WriteBlock(b Block) {
-	w.WriteString(w.indent + "#+BEGIN_" + b.Name)
+	w.WriteString(w.Indent + "#+BEGIN_" + b.Name)
 	if len(b.Parameters) != 0 {
 		w.WriteString(" " + strings.Join(b.Parameters, " "))
 	}
 	w.WriteString("\n")
 	if isRawTextBlock(b.Name) {
-		w.WriteString(w.indent)
+		w.WriteString(w.Indent)
 	}
 	content := w.WriteNodesAsString(b.Children...)
 	if b.Name == "EXAMPLE" || (b.Name == "SRC" && len(b.Parameters) >= 1 && b.Parameters[0] == "org") {
@@ -99,7 +99,7 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	}
 	w.WriteString(content)
 	if !isRawTextBlock(b.Name) {
-		w.WriteString(w.indent)
+		w.WriteString(w.Indent)
 	}
 	w.WriteString("#+END_" + b.Name + "\n")
 
@@ -132,9 +132,9 @@ func (w *OrgWriter) WriteInlineBlock(b InlineBlock) {
 }
 
 func (w *OrgWriter) WriteDrawer(d Drawer) {
-	w.WriteString(w.indent + ":" + d.Name + ":\n")
+	w.WriteString(w.Indent + ":" + d.Name + ":\n")
 	WriteNodes(w, d.Children...)
-	w.WriteString(w.indent + ":END:\n")
+	w.WriteString(w.Indent + ":END:\n")
 }
 
 func (w *OrgWriter) WritePropertyDrawer(d PropertyDrawer) {
@@ -177,14 +177,14 @@ func (w *OrgWriter) WriteSDC(s SDC) {
 func (w *OrgWriter) WriteParagraph(p Paragraph) {
 	content := w.WriteNodesAsString(p.Children...)
 	if len(content) > 0 && content[0] != '\n' {
-		w.WriteString(w.indent)
+		w.WriteString(w.Indent)
 	}
 	w.WriteString(content + "\n")
 }
 
 func (w *OrgWriter) WriteExample(e Example) {
 	for _, n := range e.Children {
-		w.WriteString(w.indent + ":")
+		w.WriteString(w.Indent + ":")
 		if content := w.WriteNodesAsString(n); content != "" {
 			w.WriteString(" " + content)
 		}
@@ -193,7 +193,7 @@ func (w *OrgWriter) WriteExample(e Example) {
 }
 
 func (w *OrgWriter) WriteKeyword(k Keyword) {
-	w.WriteString(w.indent + "#+" + k.Key + ":")
+	w.WriteString(w.Indent + "#+" + k.Key + ":")
 	if k.Value != "" {
 		w.WriteString(" " + k.Value)
 	}
@@ -223,18 +223,18 @@ func (w *OrgWriter) WriteNodeWithName(n NodeWithName) {
 }
 
 func (w *OrgWriter) WriteComment(c Comment) {
-	w.WriteString(w.indent + "# " + c.Content + "\n")
+	w.WriteString(w.Indent + "# " + c.Content + "\n")
 }
 
 func (w *OrgWriter) WriteList(l List) { WriteNodes(w, l.Items...) }
 
 func (w *OrgWriter) WriteListItem(li ListItem) {
-	originalBuilder, originalIndent := w.Builder, w.indent
-	w.Builder, w.indent = strings.Builder{}, w.indent+strings.Repeat(" ", len(li.Bullet)+1)
+	originalBuilder, originalIndent := w.Builder, w.Indent
+	w.Builder, w.Indent = strings.Builder{}, w.Indent+strings.Repeat(" ", len(li.Bullet)+1)
 	WriteNodes(w, li.Children...)
-	content := strings.TrimPrefix(w.String(), w.indent)
-	w.Builder, w.indent = originalBuilder, originalIndent
-	w.WriteString(w.indent + li.Bullet)
+	content := strings.TrimPrefix(w.String(), w.Indent)
+	w.Builder, w.Indent = originalBuilder, originalIndent
+	w.WriteString(w.Indent + li.Bullet)
 	if li.Value != "" {
 		w.WriteString(fmt.Sprintf(" [@%s]", li.Value))
 	}
@@ -249,8 +249,8 @@ func (w *OrgWriter) WriteListItem(li ListItem) {
 }
 
 func (w *OrgWriter) WriteDescriptiveListItem(di DescriptiveListItem) {
-	indent := w.indent + strings.Repeat(" ", len(di.Bullet)+1)
-	w.WriteString(w.indent + di.Bullet)
+	indent := w.Indent + strings.Repeat(" ", len(di.Bullet)+1)
+	w.WriteString(w.Indent + di.Bullet)
 	if di.Status != "" {
 		w.WriteString(fmt.Sprintf(" [%s]", di.Status))
 		indent = indent + strings.Repeat(" ", len(di.Status)+3)
@@ -260,11 +260,11 @@ func (w *OrgWriter) WriteDescriptiveListItem(di DescriptiveListItem) {
 		w.WriteString(" " + term + " ::")
 		indent = indent + strings.Repeat(" ", len(term)+4)
 	}
-	originalBuilder, originalIndent := w.Builder, w.indent
-	w.Builder, w.indent = strings.Builder{}, indent
+	originalBuilder, originalIndent := w.Builder, w.Indent
+	w.Builder, w.Indent = strings.Builder{}, indent
 	WriteNodes(w, di.Details...)
-	details := strings.TrimPrefix(w.String(), w.indent)
-	w.Builder, w.indent = originalBuilder, originalIndent
+	details := strings.TrimPrefix(w.String(), w.Indent)
+	w.Builder, w.Indent = originalBuilder, originalIndent
 	if len(details) > 0 && details[0] == '\n' {
 		w.WriteString(details)
 	} else {
@@ -274,7 +274,7 @@ func (w *OrgWriter) WriteDescriptiveListItem(di DescriptiveListItem) {
 
 func (w *OrgWriter) WriteTable(t Table) {
 	for _, row := range t.Rows {
-		w.WriteString(w.indent)
+		w.WriteString(w.Indent)
 		if len(row.Columns) == 0 {
 			w.WriteString(`|`)
 			for i := 0; i < len(t.ColumnInfos); i++ {
@@ -315,7 +315,7 @@ func (w *OrgWriter) WriteTable(t Table) {
 }
 
 func (w *OrgWriter) WriteHorizontalRule(hr HorizontalRule) {
-	w.WriteString(w.indent + "-----\n")
+	w.WriteString(w.Indent + "-----\n")
 }
 
 func (w *OrgWriter) WriteText(t Text) { w.WriteString(t.Content) }
@@ -341,11 +341,11 @@ func (w *OrgWriter) WriteStatisticToken(s StatisticToken) {
 }
 
 func (w *OrgWriter) WriteLineBreak(l LineBreak) {
-	w.WriteString(strings.Repeat("\n"+w.indent, l.Count))
+	w.WriteString(strings.Repeat("\n"+w.Indent, l.Count))
 }
 
 func (w *OrgWriter) WriteExplicitLineBreak(l ExplicitLineBreak) {
-	w.WriteString(`\\` + "\n" + w.indent)
+	w.WriteString(`\\` + "\n" + w.Indent)
 }
 
 func (w *OrgWriter) WriteTimestamp(t Timestamp) {
