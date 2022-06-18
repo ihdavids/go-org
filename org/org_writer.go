@@ -75,13 +75,16 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 		}
 	}
 	w.WriteString("\n")
-	if len(h.Children) != 0 {
-		w.WriteString(w.Indent)
-	}
+	originalIndent := w.Indent
+	w.Indent = strings.Repeat(" ", h.Lvl+1)
+	//if len(h.Children) != 0 {
+	//	w.WriteString(w.Indent)
+	//}
 	if h.Properties != nil {
 		WriteNodes(w, *h.Properties)
 	}
 	WriteNodes(w, h.Children...)
+	w.Indent = originalIndent
 }
 
 func (w *OrgWriter) WriteBlock(b Block) {
