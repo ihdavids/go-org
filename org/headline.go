@@ -46,6 +46,16 @@ type CheckStatus struct {
 	Den  int
 	Type string
 }
+
+func (s *CheckStatus) String() string {
+	if s.Type == "%" {
+		return fmt.Sprintf(" [%d%]", s.Num)
+	} else if s.Type == "/" {
+		return fmt.Sprintf(" [%d/%d]", s.Num, s.Den)
+	}
+	return ""
+}
+
 type Headline struct {
 	Pos        Pos
 	Index      int

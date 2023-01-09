@@ -66,6 +66,9 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 	}
 	w.WriteString(" ")
 	WriteNodes(w, h.Title...)
+	if h.CheckStatus != nil {
+		w.WriteString(h.CheckStatus.String())
+	}
 	if len(h.Tags) != 0 {
 		tString := ":" + strings.Join(h.Tags, ":") + ":"
 		if n := w.TagsColumn - len(tString) - (w.Len() - start); n > 0 {
