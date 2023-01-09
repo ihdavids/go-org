@@ -1,12 +1,13 @@
 package org
 
 import (
+	b64 "encoding/base64"
 	"fmt"
 	"hash"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
-	b64 "encoding/base64"
 )
 
 type ShaStack []hash.Hash
@@ -40,7 +41,11 @@ type Section struct {
 	Parent   *Section
 	Children []*Section
 }
-
+type CheckStatus struct {
+	Num  int
+	Den  int
+	Type string
+}
 type Headline struct {
 	Pos        Pos
 	Index      int
@@ -49,24 +54,37 @@ type Headline struct {
 	Priority   string
 	Properties *PropertyDrawer
 	// Scheduling timestamps
-	Scheduled *SDC
-	Closed    *SDC
-	Deadline  *SDC
-	Timestamp *Timestamp
-	Title     []Node
-	Tags      []string
-	Children  []Node
+	Scheduled   *SDC
+	Closed      *SDC
+	Deadline    *SDC
+	Timestamp   *Timestamp
+	Title       []Node
+	Tags        []string
+	Children    []Node
+	CheckStatus *CheckStatus
 	// Schedules  []Schedule
 }
 
 var headlineRegexp = regexp.MustCompile(`^([*]+)\s+(.*)`)
 var tagRegexp = regexp.MustCompile(`(.*?)\s+(:[A-Za-z0-9_@#%:]+:\s*$)`)
+var pdoneRegexp = regexp.MustCompile(`(.*?)\s\[\s*((?P<percent>\d+)%)|((?P<a>\d+)/(?P<b>\d+))\s*\]\s*$`)
 
 func lexHeadline(line string, row, col int) (token, bool) {
 	if m := headlineRegexp.FindStringSubmatch(line); m != nil {
 		return token{"headline", 0, m[2], m, Pos{row, col}}, true
 	}
 	return nilToken, false
+}
+
+func reMatchParams(re *regexp.Regexp, m []string) (paramsMap map[string]string) {
+
+	paramsMap = make(map[string]string)
+	for i, name := range re.SubexpNames() {
+		if i > 0 && i <= len(m) {
+			paramsMap[name] = m[i]
+		}
+	}
+	return paramsMap
 }
 
 func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
@@ -95,6 +113,31 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	if m := tagRegexp.FindStringSubmatch(text); m != nil {
 		text = m[1]
 		headline.Tags = strings.FieldsFunc(m[2], func(r rune) bool { return r == ':' })
+	}
+
+	if m := pdoneRegexp.FindStringSubmatch(text); m != nil {
+		info := reMatchParams(pdoneRegexp, m)
+		headline.CheckStatus = new(CheckStatus)
+		if p, ok := info["precent"]; ok {
+			per, err := strconv.Atoi(p)
+			if err != nil {
+				headline.CheckStatus.Type = "%"
+				headline.CheckStatus.Num = per
+			} else {
+				headline.CheckStatus = nil
+			}
+		} else {
+			a, err := strconv.Atoi(info["a"])
+			b, err2 := strconv.Atoi(info["b"])
+			if err != nil && err2 != nil {
+				headline.CheckStatus.Type = "/"
+				headline.CheckStatus.Num = a
+				headline.CheckStatus.Den = b
+			} else {
+				headline.CheckStatus = nil
+			}
+		}
+
 	}
 
 	headline.Title = d.parseInline(text, i)
