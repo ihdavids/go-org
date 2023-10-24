@@ -20,6 +20,8 @@ type Row struct {
 }
 
 type Column struct {
+	Pos      Pos
+	EndPos   Pos
 	Children []Node
 	*ColumnInfo
 }
@@ -46,13 +48,25 @@ func lexTable(line string, row, col int) (token, bool) {
 
 func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	rawRows, separatorIndices, start := [][]string{}, []int{}, i
+	startPoss := [][]Pos{}
+	endPoss := [][]Pos{}
 	for ; !parentStop(d, i); i++ {
 		if t := d.tokens[i]; t.kind == "tableRow" {
 			rawRow := strings.FieldsFunc(d.tokens[i].content, func(r rune) bool { return r == '|' })
+			startPos := d.tokens[i].pos
+			endPos := Pos{Row: startPos.Row, Col: startPos.Col}
+			curStartPos := []Pos{}
+			curEndPos := []Pos{}
 			for i := range rawRow {
+				startPos = endPos
+				endPos = Pos{Row: startPos.Row, Col: startPos.Col + len(rawRow[i])}
 				rawRow[i] = strings.TrimSpace(rawRow[i])
+				curStartPos = append(curStartPos, startPos)
+				curEndPos = append(curEndPos, endPos)
 			}
 			rawRows = append(rawRows, rawRow)
+			startPoss = append(startPoss, curStartPos)
+			endPoss = append(endPoss, curEndPos)
 		} else if t.kind == "tableSeparator" {
 			separatorIndices = append(separatorIndices, i-start)
 			rawRows = append(rawRows, nil)
@@ -62,11 +76,13 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	}
 
 	table := Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos()}
-	for _, rawColumns := range rawRows {
+	for r, rawColumns := range rawRows {
 		row := Row{nil, isSpecialRow(rawColumns)}
+		starts := startPoss[r]
+		ends := endPoss[r]
 		if len(rawColumns) != 0 {
 			for i := range table.ColumnInfos {
-				column := Column{nil, &table.ColumnInfos[i]}
+				column := Column{starts[i], ends[i], nil, &table.ColumnInfos[i]}
 				if i < len(rawColumns) {
 					column.Children = d.parseInline(rawColumns[i], start) // TODO: This is off by the row index
 				}
@@ -135,5 +151,20 @@ func isSpecialRow(rawColumns []string) bool {
 	return isAlignRow
 }
 
+func (self Row) GetEnd() Pos {
+	return self.Columns[len(self.Columns)-1].GetEnd()
+}
+func (self Row) GetPos() Pos {
+	return self.Columns[0].GetPos()
+}
+func (self Column) GetEnd() Pos {
+	return self.EndPos
+}
+func (self Column) GetPos() Pos {
+	return self.Pos
+}
 func (n Table) String() string { return orgWriter.WriteNodesAsString(n) }
 func (self Table) GetPos() Pos { return self.Pos }
+func (self Table) GetEnd() Pos {
+	return self.Rows[len(self.Rows)-1].GetEnd()
+}

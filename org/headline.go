@@ -274,5 +274,7 @@ func (parent *Section) add(current *Section) {
 
 func (n Headline) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n Headline) GetPos() Pos    { return n.Pos }
+func (n Headline) GetEnd() Pos    { return n.Pos }
 func (n SDC) String() string      { return orgWriter.WriteNodesAsString(n) }
 func (n SDC) GetPos() Pos         { return n.Pos }
+func (n SDC) GetEnd() Pos         { return n.Pos }

@@ -35,3 +35,9 @@ func (d *Document) parseFootnoteDefinition(i int, parentStop stopFn) (int, Node)
 
 func (n FootnoteDefinition) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n FootnoteDefinition) GetPos() Pos    { return n.Pos }
+func (n FootnoteDefinition) GetEnd() Pos {
+	if len(n.Children) > 0 {
+		return n.Children[len(n.Children)-1].GetEnd()
+	}
+	return n.GetPos()
+}

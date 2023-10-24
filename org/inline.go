@@ -8,8 +8,19 @@ import (
 	"unicode/utf8"
 )
 
+func countRune(s string, r rune) int {
+	count := 0
+	for _, c := range s {
+		if c == r {
+			count++
+		}
+	}
+	return count
+}
+
 type Text struct {
 	Pos     Pos
+	EndPos  Pos
 	Content string
 	IsRaw   bool
 }
@@ -17,7 +28,8 @@ type Text struct {
 // Schedule data is parsed from timestamps
 // SCHEDULE or DEADLINE blocks
 type Schedule struct {
-	Pos Pos
+	Pos    Pos
+	EndPos Pos
 }
 
 type LineBreak struct {
@@ -31,12 +43,14 @@ type ExplicitLineBreak struct {
 
 type StatisticToken struct {
 	Pos     Pos
+	EndPos  Pos
 	Content string
 }
 
 type Timestamp struct {
-	Pos  Pos
-	Time *OrgDate
+	Pos    Pos
+	EndPos Pos
+	Time   *OrgDate
 	/*
 		Time     time.Time
 		IsDate   bool
@@ -46,12 +60,14 @@ type Timestamp struct {
 
 type Emphasis struct {
 	Pos     Pos
+	EndPos  Pos
 	Kind    string
 	Content []Node
 }
 
 type InlineBlock struct {
 	Pos        Pos
+	EndPos     Pos
 	Name       string
 	Parameters []string
 	Children   []Node
@@ -141,7 +157,9 @@ func (d *Document) parseInline(input string, i int) (nodes []Node) {
 		current -= rewind
 		if consumed != 0 {
 			if current > previous {
-				nodes = append(nodes, Text{d.tokens[i].Pos(), input[previous:current], false})
+				inputContent := input[previous:current]
+				inputPos := d.tokens[i].Pos()
+				nodes = append(nodes, Text{inputPos, computeTextEnd(inputPos, inputContent), inputContent, false})
 			}
 			if node != nil {
 				nodes = append(nodes, node)
@@ -154,7 +172,9 @@ func (d *Document) parseInline(input string, i int) (nodes []Node) {
 	}
 
 	if previous < len(input) {
-		nodes = append(nodes, Text{d.tokens[i].Pos(), input[previous:], false})
+		start := d.tokens[i].Pos()
+		content := input[previous:]
+		nodes = append(nodes, Text{d.tokens[i].Pos(), computeTextEnd(start, content), content, false})
 	}
 	return nodes
 }
@@ -165,7 +185,9 @@ func (d *Document) parseRawInline(input string, ni int) (nodes []Node) {
 		if input[current] == '\n' {
 			consumed, node := d.parseLineBreak(input, current, ni)
 			if current > previous {
-				nodes = append(nodes, Text{d.tokens[ni].Pos(), input[previous:current], true})
+				content := input[previous:current]
+				start := d.tokens[ni].Pos()
+				nodes = append(nodes, Text{start, computeTextEnd(start, content), content, true})
 			}
 			nodes = append(nodes, node)
 			current += consumed
@@ -175,7 +197,9 @@ func (d *Document) parseRawInline(input string, ni int) (nodes []Node) {
 		}
 	}
 	if previous < len(input) {
-		nodes = append(nodes, Text{d.tokens[ni].Pos(), input[previous:], true})
+		content := input[previous:]
+		start := d.tokens[ni].Pos()
+		nodes = append(nodes, Text{start, computeTextEnd(start, content), content, true})
 	}
 	return nodes
 }
@@ -194,14 +218,14 @@ func (d *Document) parseInlineBlock(input string, start int, ni int) (int, int, 
 		return 0, 0, nil
 	}
 	if m := inlineBlockRegexp.FindStringSubmatch(input[start-3:]); m != nil {
-		return 3, len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, "src", strings.Fields(m[1] + " " + m[3]), d.parseRawInline(m[4], ni)}
+		return 3, len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, start + len(m[0])}, "src", strings.Fields(m[1] + " " + m[3]), d.parseRawInline(m[4], ni)}
 	}
 	return 0, 0, nil
 }
 
 func (d *Document) parseInlineExportBlock(input string, start int, ni int) (int, Node) {
 	if m := inlineExportBlockRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, "export", m[1:2], d.parseRawInline(m[2], ni)}
+		return len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, start + len(m[0])}, "export", m[1:2], d.parseRawInline(m[2], ni)}
 	}
 	return 0, nil
 }
@@ -247,7 +271,9 @@ func (d *Document) parseLatexFragment(input string, start int, pairLength int, n
 
 func (d *Document) parseSubOrSuperScript(input string, start int, ni int) (int, Node) {
 	if m := subScriptSuperScriptRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[2]) + 3, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, m[1] + "{}", []Node{Text{Pos{d.tokens[ni].Pos().Row, start}, m[2], false}}}
+		fullLen := len(m[2]) + 3
+		startRow := d.tokens[ni].Pos().Row
+		return fullLen, Emphasis{Pos{startRow, start}, Pos{startRow, start + fullLen}, m[1] + "{}", []Node{Text{Pos{startRow, start}, computeTextEnd(Pos{startRow, start}, m[2]), m[2], false}}}
 	}
 	return 0, nil
 }
@@ -297,7 +323,9 @@ func (d *Document) parseFootnoteReference(input string, start int, ni int) (int,
 
 func (d *Document) parseStatisticToken(input string, start int, ni int) (int, Node) {
 	if m := statisticsTokenRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[1]) + 2, StatisticToken{Pos{d.tokens[ni].Pos().Row, start}, m[1]}
+		fullLen := len(m[1]) + 2
+		startRow := d.tokens[ni].Pos().Row
+		return fullLen, StatisticToken{Pos{startRow, start}, Pos{startRow, start + fullLen}, m[1]}
 	}
 	return 0, nil
 }
@@ -356,11 +384,13 @@ func (d *Document) parseRegularLink(input string, start int, ni int) (int, Node)
 func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
 	s, _, m := ParseTimestamp(input[start:])
 	if s != nil {
-		timestamp := Timestamp{Pos{d.tokens[ni].Pos().Row, start}, s /*, isDate, interval*/}
+		startRow := d.tokens[ni].Pos().Row
+		fullLen := len(m["_fullmatch"])
+		timestamp := Timestamp{Pos{startRow, start}, Pos{startRow, start + fullLen}, s /*, isDate, interval*/}
 		if d.Outline.last != nil && d.Outline.last.Headline != nil {
 			d.Outline.last.Headline.Timestamp = &timestamp
 		}
-		return len(m["_fullmatch"]), timestamp
+		return fullLen, timestamp
 	}
 	return 0, nil
 }
@@ -381,9 +411,9 @@ func (d *Document) parseEmphasis(input string, start int, isRaw bool, ni int) (i
 
 		if input[i] == marker && i != start+1 && hasValidPostAndBorderChars(input, i) {
 			if isRaw {
-				return i + 1 - start, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, input[start : start+1], d.parseRawInline(input[start+1:i], ni)}
+				return i + 1 - start, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, i}, input[start : start+1], d.parseRawInline(input[start+1:i], ni)}
 			}
-			return i + 1 - start, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, input[start : start+1], d.parseInline(input[start+1:i], ni)}
+			return i + 1 - start, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, i}, input[start : start+1], d.parseInline(input[start+1:i], ni)}
 		}
 	}
 	return 0, nil
@@ -452,3 +482,30 @@ func (n FootnoteLink) GetPos() Pos         { return n.Pos }
 func (n RegularLink) GetPos() Pos          { return n.Pos }
 func (n Macro) GetPos() Pos                { return n.Pos }
 func (n Timestamp) GetPos() Pos            { return n.Pos }
+func computeTextEnd(pos Pos, content string) Pos {
+	temp := strings.Split(content, "\n")
+	return Pos{Row: pos.Row + len(temp), Col: len(temp[len(temp)-1])}
+}
+func (n Text) GetEnd() Pos              { return n.EndPos }
+func (n LineBreak) GetEnd() Pos         { return Pos{n.Pos.Row + n.Count - 1, 0} }
+func (n ExplicitLineBreak) GetEnd() Pos { return n.Pos }
+func (n StatisticToken) GetEnd() Pos    { return n.EndPos }
+func (n Emphasis) GetEnd() Pos {
+	return n.EndPos
+}
+func (n InlineBlock) GetEnd() Pos {
+	return n.EndPos
+}
+func (n LatexFragment) GetEnd() Pos {
+	return n.Content[len(n.Content)-1].GetEnd()
+}
+func (n FootnoteLink) GetEnd() Pos { return n.Pos }
+func (n RegularLink) GetEnd() Pos {
+	return n.Description[len(n.Description)-1].GetEnd()
+}
+func (n Macro) GetEnd() Pos {
+	return n.Pos
+}
+func (n Timestamp) GetEnd() Pos {
+	return n.EndPos
+}

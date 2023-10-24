@@ -98,4 +98,19 @@ func (d *PropertyDrawer) Get(key string) (string, bool) {
 func (n Drawer) String() string         { return orgWriter.WriteNodesAsString(n) }
 func (n PropertyDrawer) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n PropertyDrawer) GetPos() Pos    { return n.Pos }
-func (n Drawer) GetPos() Pos            { return n.Pos }
+func (n PropertyDrawer) GetEnd() Pos {
+	if len(n.Properties) > 0 {
+		cnt := len(n.Properties)
+		pos := n.GetPos()
+		pos.Row += cnt
+		return pos
+	}
+	return n.GetPos()
+}
+func (n Drawer) GetPos() Pos { return n.Pos }
+func (n Drawer) GetEnd() Pos {
+	if len(n.Children) > 0 {
+		return n.Children[len(n.Children)-1].GetEnd()
+	}
+	return n.GetPos()
+}

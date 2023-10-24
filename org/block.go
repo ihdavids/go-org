@@ -153,5 +153,20 @@ func (n Example) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n Block) String() string   { return orgWriter.WriteNodesAsString(n) }
 func (n Result) String() string  { return orgWriter.WriteNodesAsString(n) }
 func (self Example) GetPos() Pos { return self.Pos }
-func (self Block) GetPos() Pos   { return self.Pos }
-func (self Result) GetPos() Pos  { return self.Pos }
+func (self Example) GetEnd() Pos {
+	if len(self.Children) > 0 {
+		return self.Children[len(self.Children)-1].GetEnd()
+	}
+	return self.GetPos()
+}
+func (self Block) GetPos() Pos { return self.Pos }
+func (self Block) GetEnd() Pos {
+	if len(self.Children) > 0 {
+		return self.Children[len(self.Children)-1].GetEnd()
+	}
+	return self.GetPos()
+}
+func (self Result) GetPos() Pos { return self.Pos }
+func (self Result) GetEnd() Pos {
+	return self.Node.GetEnd()
+}

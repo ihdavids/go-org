@@ -127,3 +127,12 @@ func (n DescriptiveListItem) String() string { return orgWriter.WriteNodesAsStri
 func (self DescriptiveListItem) GetPos() Pos { return self.Pos }
 func (self ListItem) GetPos() Pos            { return self.Pos }
 func (self List) GetPos() Pos                { return self.Pos }
+func (self DescriptiveListItem) GetEnd() Pos {
+	return self.Details[len(self.Details)-1].GetEnd()
+}
+func (self ListItem) GetEnd() Pos {
+	return self.Children[len(self.Children)-1].GetEnd()
+}
+func (self List) GetEnd() Pos {
+	return self.Items[len(self.Items)-1].GetEnd()
+}

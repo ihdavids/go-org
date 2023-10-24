@@ -4,12 +4,13 @@
 // Further export formats can be defined using the Writer interface.
 //
 // You probably want to start with something like this:
-//   input := strings.NewReader("Your Org mode input")
-//   html, err := org.New().Parse(input, "./").Write(org.NewHTMLWriter())
-//   if err != nil {
-//       log.Fatalf("Something went wrong: %s", err)
-//   }
-//   log.Print(html)
+//
+//	input := strings.NewReader("Your Org mode input")
+//	html, err := org.New().Parse(input, "./").Write(org.NewHTMLWriter())
+//	if err != nil {
+//	    log.Fatalf("Something went wrong: %s", err)
+//	}
+//	log.Print(html)
 package org
 
 import (
@@ -53,6 +54,7 @@ type Document struct {
 type Node interface {
 	String() string // String returns the pretty printed Org mode string for the node (see OrgWriter).
 	GetPos() Pos    // Position in the file of the token
+	GetEnd() Pos    // Position of next token in stream
 }
 
 type lexFn = func(line string, row, col int) (t token, ok bool)

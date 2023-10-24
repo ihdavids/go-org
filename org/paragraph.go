@@ -52,3 +52,7 @@ func (n Paragraph) String() string      { return orgWriter.WriteNodesAsString(n)
 func (n HorizontalRule) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n HorizontalRule) GetPos() Pos    { return n.Pos }
 func (n Paragraph) GetPos() Pos         { return n.Pos }
+func (n HorizontalRule) GetEnd() Pos    { return n.Pos }
+func (n Paragraph) GetEnd() Pos {
+	return n.Children[len(n.Children)-1].GetEnd()
+}

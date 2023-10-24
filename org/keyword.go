@@ -9,13 +9,15 @@ import (
 
 type Comment struct {
 	Pos     Pos
+	EndPos  Pos
 	Content string
 }
 
 type Keyword struct {
-	Pos   Pos
-	Key   string
-	Value string
+	Pos    Pos
+	EndPos Pos
+	Key    string
+	Value  string
 }
 
 type NodeWithName struct {
@@ -24,6 +26,7 @@ type NodeWithName struct {
 }
 
 type NodeWithMeta struct {
+	Pos  Pos
 	Node Node
 	Meta Metadata
 }
@@ -34,6 +37,7 @@ type Metadata struct {
 }
 
 type Include struct {
+	EndPos Pos
 	Keyword
 	Resolve func() Node
 }
@@ -54,7 +58,8 @@ func lexKeywordOrComment(line string, row, col int) (token, bool) {
 }
 
 func (d *Document) parseComment(i int, stop stopFn) (int, Node) {
-	return 1, Comment{d.tokens[i].Pos(), d.tokens[i].content}
+	p := d.tokens[i].Pos()
+	return 1, Comment{p, Pos{Row: p.Row, Col: p.Col + len(d.tokens[i].content)}, d.tokens[i].content}
 }
 
 func (d *Document) parseKeyword(i int, stop stopFn) (int, Node) {
@@ -106,6 +111,7 @@ func (d *Document) parseNodeWithName(k Keyword, i int, stop stopFn) (int, Node) 
 
 func (d *Document) parseAffiliated(i int, stop stopFn) (int, Node) {
 	start, meta := i, Metadata{}
+	startPos := d.tokens[i].pos
 	for ; !stop(d, i) && d.tokens[i].kind == "keyword"; i++ {
 		switch k := parseKeyword(d.tokens[i], i); k.Key {
 		case "CAPTION":
@@ -145,7 +151,8 @@ func (d *Document) parseAffiliated(i int, stop stopFn) (int, Node) {
 
 func parseKeyword(t token, ni int) Keyword {
 	k, v := t.matches[2], t.matches[4]
-	return Keyword{t.pos, strings.ToUpper(k), strings.TrimSpace(v)}
+	p := t.pos
+	return Keyword{t.pos, Pos{Row: p.Row, Col: p.Col + len(t.content)}, strings.ToUpper(k), strings.TrimSpace(v)}
 }
 
 // TODO: This will break the token stream positions in the file!
@@ -154,7 +161,8 @@ func (d *Document) parseInclude(k Keyword, ni int) (int, Node) {
 		d.Log.Printf("Bad include %#v", k)
 		return k
 	}
-	if m := includeFileRegexp.FindStringSubmatch(k.Value); m != nil {
+	var m []string
+	if m = includeFileRegexp.FindStringSubmatch(k.Value); m != nil {
 		path, kind, lang := m[1], m[2], m[3]
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(filepath.Dir(d.Path), path)
@@ -168,7 +176,8 @@ func (d *Document) parseInclude(k Keyword, ni int) (int, Node) {
 			return Block{strings.ToUpper(kind), k.Pos, []string{lang}, d.parseRawInline(string(bs), ni), nil}
 		}
 	}
-	return 1, Include{k, resolve}
+	p := k.GetEnd()
+	return 1, Include{Pos{p.Row, p.Col + len(m[0])}, k, resolve}
 }
 
 func (d *Document) loadSetupFile(k Keyword) (int, Node) {
@@ -200,6 +209,11 @@ func (n Include) String() string      { return orgWriter.WriteNodesAsString(n) }
 
 func (n Include) GetPos() Pos      { return n.Keyword.GetPos() }
 func (n NodeWithName) GetPos() Pos { return n.Node.GetPos() }
-func (n NodeWithMeta) GetPos() Pos { return n.Node.GetPos() }
+func (n NodeWithMeta) GetPos() Pos { return n.Pos }
 func (n Comment) GetPos() Pos      { return n.Pos }
 func (n Keyword) GetPos() Pos      { return n.Pos }
+func (n Include) GetEnd() Pos      { return n.EndPos }
+func (n NodeWithName) GetEnd() Pos { return n.Node.GetEnd() }
+func (n NodeWithMeta) GetEnd() Pos { return n.Node.GetEnd() } // Metadata precedes the node, so ignore
+func (n Comment) GetEnd() Pos      { return n.EndPos }
+func (n Keyword) GetEnd() Pos      { return n.EndPos }
