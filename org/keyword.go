@@ -146,7 +146,7 @@ func (d *Document) parseAffiliated(i int, stop stopFn) (int, Node) {
 		return 0, nil
 	}
 	i += consumed
-	return i - start, NodeWithMeta{node, meta}
+	return i - start, NodeWithMeta{startPos, node, meta}
 }
 
 func parseKeyword(t token, ni int) Keyword {
