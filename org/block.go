@@ -103,7 +103,9 @@ func (d *Document) parseExample(i int, parentStop stopFn) (int, Node) {
 	example, start := Example{}, i
 	example.Pos = d.tokens[i].Pos()
 	for ; !parentStop(d, i) && d.tokens[i].kind == "example"; i++ {
-		example.Children = append(example.Children, Text{d.tokens[i].Pos(), d.tokens[i].content, true})
+		p := d.tokens[i].Pos()
+		content := d.tokens[i].content
+		example.Children = append(example.Children, Text{p, computeTextEnd(p, content), content, true})
 	}
 	return i - start, example
 }

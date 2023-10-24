@@ -49,7 +49,7 @@ type CheckStatus struct {
 
 func (s *CheckStatus) String() string {
 	if s.Type == "%" {
-		return fmt.Sprintf(" [%d%]", s.Num)
+		return fmt.Sprintf(" [%d%s]", s.Num, "%")
 	} else if s.Type == "/" {
 		return fmt.Sprintf(" [%d/%d]", s.Num, s.Den)
 	}

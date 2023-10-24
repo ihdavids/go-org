@@ -48,7 +48,9 @@ func (d *Document) parseDrawer(i int, parentStop stopFn) (int, Node) {
 		i += consumed
 		drawer.Children = append(drawer.Children, nodes...)
 		if i < len(d.tokens) && d.tokens[i].kind == "beginDrawer" {
-			p := Paragraph{d.tokens[i].Pos(), []Node{Text{d.tokens[i].Pos(), ":" + d.tokens[i].content + ":", false}}}
+			startPos := d.tokens[i].Pos()
+			content := d.tokens[i].content
+			p := Paragraph{d.tokens[i].Pos(), []Node{Text{startPos, computeTextEnd(startPos, content), ":" + content + ":", false}}}
 			drawer.Children = append(drawer.Children, p)
 			i++
 		} else {
