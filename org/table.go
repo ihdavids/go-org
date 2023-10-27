@@ -48,8 +48,8 @@ func lexTable(line string, row, col int) (token, bool) {
 
 func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	rawRows, separatorIndices, start := [][]string{}, []int{}, i
-	startPoss := [][]Pos{}
-	endPoss := [][]Pos{}
+	rowStartPositions := [][]Pos{}
+	rowEndPositions := [][]Pos{}
 	for ; !parentStop(d, i); i++ {
 		if t := d.tokens[i]; t.kind == "tableRow" {
 			rawRow := strings.FieldsFunc(d.tokens[i].content, func(r rune) bool { return r == '|' })
@@ -65,11 +65,13 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 				curEndPos = append(curEndPos, endPos)
 			}
 			rawRows = append(rawRows, rawRow)
-			startPoss = append(startPoss, curStartPos)
-			endPoss = append(endPoss, curEndPos)
+			rowStartPositions = append(rowStartPositions, curStartPos)
+			rowEndPositions = append(rowEndPositions, curEndPos)
 		} else if t.kind == "tableSeparator" {
 			separatorIndices = append(separatorIndices, i-start)
 			rawRows = append(rawRows, nil)
+			rowStartPositions = append(rowStartPositions, nil)
+			rowEndPositions = append(rowEndPositions, nil)
 		} else {
 			break
 		}
@@ -78,8 +80,8 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	table := Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos()}
 	for r, rawColumns := range rawRows {
 		row := Row{nil, isSpecialRow(rawColumns)}
-		starts := startPoss[r]
-		ends := endPoss[r]
+		starts := rowStartPositions[r]
+		ends := rowEndPositions[r]
 		if len(rawColumns) != 0 {
 			for i := range table.ColumnInfos {
 				column := Column{starts[i], ends[i], nil, &table.ColumnInfos[i]}
