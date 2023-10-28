@@ -18,6 +18,9 @@ func (w *ExtendedHTMLWriter) WriteText(t Text) {
 
 func TestHTMLWriter(t *testing.T) {
 	for _, path := range orgTestFiles() {
+		if strings.Contains(path, "_result_out.") {
+			continue
+		}
 		expected := fileString(path[:len(path)-len(".org")] + ".html")
 		reader, writer := strings.NewReader(fileString(path)), NewHTMLWriter()
 		actual, err := New().Silent().Parse(reader, path).Write(writer)

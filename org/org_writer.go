@@ -156,7 +156,11 @@ func (w *OrgWriter) WritePropertyDrawer(d PropertyDrawer) {
 }
 
 func (w *OrgWriter) WriteFootnoteDefinition(f FootnoteDefinition) {
-	w.WriteString(fmt.Sprintf("[fn:%s]", f.Name))
+	if f.Inline {
+		w.WriteString(fmt.Sprintf("[fn:%s]", f.Name))
+	} else {
+		w.WriteString(fmt.Sprintf(w.Indent+"[fn:%s]", f.Name))
+	}
 	content := w.WriteNodesAsString(f.Children...)
 	if content != "" && !unicode.IsSpace(rune(content[0])) {
 		w.WriteString(" ")

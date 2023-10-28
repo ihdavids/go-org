@@ -3,6 +3,7 @@ package org
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -23,10 +24,15 @@ func (w *ExtendedOrgWriter) WriteText(t Text) {
 
 func TestOrgWriter(t *testing.T) {
 	for _, path := range orgTestFiles() {
+		if strings.Contains(path, "_result_out.") {
+			continue
+		}
 		expected := fileString(path[:len(path)-len(".org")] + ".pretty_org")
 		reader, writer := strings.NewReader(fileString(path)), NewOrgWriter()
 		d := New().Silent().Parse(reader, path)
 		actual, err := d.Write(writer)
+		output := path[:len(path)-len(".org")] + "_result_out.org"
+		os.WriteFile(output, []byte(actual), os.ModePerm)
 		re := regexp.MustCompile(`\r?\n`)
 		actual = re.ReplaceAllString(actual, "\n")
 		expected = re.ReplaceAllString(expected, "\n")
@@ -39,7 +45,7 @@ func TestOrgWriter(t *testing.T) {
 			continue
 		}
 		if actual != expected {
-			t.Errorf("%s:\n%s'", path, diff(actual, expected))
+			t.Errorf("%s:\nERROR:\n%s'", path, diff(actual, expected))
 		} else {
 			t.Logf("%s: passed!", path)
 		}
