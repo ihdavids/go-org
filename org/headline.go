@@ -58,6 +58,7 @@ func (s *CheckStatus) String() string {
 
 type Headline struct {
 	Pos        Pos
+	EndPos     Pos
 	Index      int
 	Lvl        int
 	Status     string
@@ -98,7 +99,8 @@ func reMatchParams(re *regexp.Regexp, m []string) (paramsMap map[string]string) 
 }
 
 func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
-	t, headline := d.tokens[i], Headline{Pos: d.tokens[i].Pos()}
+	pos := d.tokens[i].Pos()
+	t, headline := d.tokens[i], Headline{Pos: pos, EndPos: Pos{Row: pos.Row, Col: pos.Col + len(d.tokens[i].content)}}
 	headline.Lvl = len(t.matches[1])
 
 	headline.Index = d.addHeadline(&headline)
@@ -274,7 +276,7 @@ func (parent *Section) add(current *Section) {
 
 func (n Headline) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n Headline) GetPos() Pos    { return n.Pos }
-func (n Headline) GetEnd() Pos    { return n.Pos }
+func (n Headline) GetEnd() Pos    { return n.EndPos }
 func (n SDC) String() string      { return orgWriter.WriteNodesAsString(n) }
 func (n SDC) GetPos() Pos         { return n.Pos }
 func (n SDC) GetEnd() Pos         { return n.Pos }
