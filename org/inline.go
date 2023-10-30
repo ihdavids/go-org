@@ -88,6 +88,7 @@ type FootnoteLink struct {
 
 type RegularLink struct {
 	Pos         Pos
+	EndPos      Pos
 	Protocol    string
 	Description []Node
 	URL         string
@@ -314,7 +315,12 @@ func (d *Document) parseFootnoteReference(input string, start int, ni int) (int,
 		}
 		link := FootnoteLink{Pos{d.tokens[ni].Pos().Row, start}, name, nil}
 		if definition != "" {
-			link.Definition = &FootnoteDefinition{Pos{d.tokens[ni].Pos().Row, start}, name, []Node{Paragraph{Pos{d.tokens[ni].Pos().Row, start}, d.parseInline(definition, ni)}}, true}
+			nodes := d.parseInline(definition, ni)
+			end := d.tokens[ni].EndPos()
+			if len(nodes) > 0 {
+				end = nodes[len(nodes)-1].GetEnd()
+			}
+			link.Definition = &FootnoteDefinition{Pos{d.tokens[ni].Pos().Row, start}, name, []Node{Paragraph{Pos{d.tokens[ni].Pos().Row, start}, end, nodes}}, true}
 		}
 		return len(m[0]), link
 	}
@@ -353,7 +359,7 @@ func (d *Document) parseAutoLink(input string, start int, ni int) (int, int, Nod
 	if path == "://" {
 		return 0, 0, nil
 	}
-	return len(protocol), len(path + protocol), RegularLink{Pos{d.tokens[ni].Pos().Row, start}, protocol, nil, protocol + path, true}
+	return len(protocol), len(path + protocol), RegularLink{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, end}, protocol, nil, protocol + path, true}
 }
 
 func (d *Document) parseRegularLink(input string, start int, ni int) (int, Node) {
@@ -378,7 +384,7 @@ func (d *Document) parseRegularLink(input string, start int, ni int) (int, Node)
 	if len(linkParts) == 2 {
 		protocol = linkParts[0]
 	}
-	return consumed, RegularLink{Pos{d.tokens[ni].Pos().Row, start}, protocol, description, link, false}
+	return consumed, RegularLink{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, end + 2}, protocol, description, link, false}
 }
 
 func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
@@ -483,7 +489,7 @@ func (n RegularLink) GetPos() Pos          { return n.Pos }
 func (n Macro) GetPos() Pos                { return n.Pos }
 func (n Timestamp) GetPos() Pos            { return n.Pos }
 func computeTextEnd(pos Pos, content string) Pos {
-	temp := strings.Split(content, "\n")
+	temp := strings.Split(strings.TrimRight(content, "\n"), "\n")
 	return Pos{Row: pos.Row + len(temp), Col: len(temp[len(temp)-1])}
 }
 func (n Text) GetEnd() Pos              { return n.EndPos }
@@ -501,7 +507,7 @@ func (n LatexFragment) GetEnd() Pos {
 }
 func (n FootnoteLink) GetEnd() Pos { return n.Pos }
 func (n RegularLink) GetEnd() Pos {
-	return n.Description[len(n.Description)-1].GetEnd()
+	return n.EndPos
 }
 func (n Macro) GetEnd() Pos {
 	return n.Pos

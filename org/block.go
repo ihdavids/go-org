@@ -32,23 +32,27 @@ var exampleBlockEscapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*),([ \t]*)(\*|,\
 
 func lexBlock(line string, row, col int) (token, bool) {
 	if m := beginBlockRegexp.FindStringSubmatch(line); m != nil {
-		return token{"beginBlock", len(m[1]), strings.ToUpper(m[2]), m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"beginBlock", len(m[1]), strings.ToUpper(m[2]), m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := endBlockRegexp.FindStringSubmatch(line); m != nil {
-		return token{"endBlock", len(m[1]), strings.ToUpper(m[2]), m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"endBlock", len(m[1]), strings.ToUpper(m[2]), m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
 
 func lexResult(line string, row, col int) (token, bool) {
 	if m := resultRegexp.FindStringSubmatch(line); m != nil {
-		return token{"result", len(m[1]), "", m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"result", len(m[1]), "", m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
 
 func lexExample(line string, row, col int) (token, bool) {
 	if m := exampleLineRegexp.FindStringSubmatch(line); m != nil {
-		return token{"example", len(m[1]), m[3], m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"example", len(m[1]), m[3], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }

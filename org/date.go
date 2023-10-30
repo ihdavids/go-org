@@ -11,65 +11,71 @@ import (
 )
 
 /*
-   """
-   Generate timetamp regex for active/inactive/nobrace brace type
+"""
+Generate timetamp regex for active/inactive/nobrace brace type
 
-   :type brtype: {'active', 'inactive', 'nobrace'}
-   :arg  brtype:
-       It specifies a type of brace.
-       active: <>-type; inactive: []-type; nobrace: no braces.
+:type brtype: {'active', 'inactive', 'nobrace'}
+:arg  brtype:
 
-   :type prefix: str or None
-   :arg  prefix:
-       It will be appended to the head of keys of the "groupdict".
-       For example, if prefix is ``'active_'`` the groupdict has
-       keys such as ``'active_year'``, ``'active_month'``, and so on.
-       If it is None it will be set to ``brtype`` + ``'_'``.
+	It specifies a type of brace.
+	active: <>-type; inactive: []-type; nobrace: no braces.
 
-   :type nocookie: bool
-   :arg  nocookie:
-       Cookie part (e.g., ``'-3d'`` or ``'+6m'``) is not included if
-       it is ``True``.  Default value is ``False``.
+:type prefix: str or None
+:arg  prefix:
 
-   >>> timestamp_re = re.compile(
-   ...     gene_timestamp_regex('active', prefix=''),
-   ...     re.VERBOSE)
-   >>> timestamp_re.match('no match')  # returns None
-   >>> m = timestamp_re.match('<2010-06-21 Mon>')
-   >>> m.group()
-   '<2010-06-21 Mon>'
-   >>> '{year}-{month}-{day}'.format(**m.groupdict())
-   '2010-06-21'
-   >>> m = timestamp_re.match('<2005-10-01 Sat 12:30 +7m -3d>')
-   >>> from collections import OrderedDict
-   >>> sorted(m.groupdict().items())
-   ... # doctest: +NORMALIZE_WHITESPACE
-   [('day', '01'),
-    ('end_hour', None), ('end_min', None),
-    ('hour', '12'), ('min', '30'),
-    ('month', '10'),
-    ('repeatdwmy', 'm'), ('repeatnum', '7'), ('repeatpre', '+'),
-    ('warndwmy', 'd'), ('warnnum', '3'), ('warnpre', '-'), ('year', '2005')]
+	It will be appended to the head of keys of the "groupdict".
+	For example, if prefix is ``'active_'`` the groupdict has
+	keys such as ``'active_year'``, ``'active_month'``, and so on.
+	If it is None it will be set to ``brtype`` + ``'_'``.
 
-   When ``brtype = 'nobrace'``, cookie part cannot be retrieved.
+:type nocookie: bool
+:arg  nocookie:
 
-   >>> timestamp_re = re.compile(
-   ...     gene_timestamp_regex('nobrace', prefix=''),
-   ...     re.VERBOSE)
-   >>> timestamp_re.match('no match')  # returns None
-   >>> m = timestamp_re.match('2010-06-21 Mon')
-   >>> m.group()
-   '2010-06-21'
-   >>> '{year}-{month}-{day}'.format(**m.groupdict())
-   '2010-06-21'
-   >>> m = timestamp_re.match('2005-10-01 Sat 12:30 +7m -3d')
-   >>> sorted(m.groupdict().items())
-   ... # doctest: +NORMALIZE_WHITESPACE
-   [('day', '01'),
-    ('end_hour', None), ('end_min', None),
-    ('hour', '12'), ('min', '30'),
-    ('month', '10'), ('year', '2005')]
-   """
+	Cookie part (e.g., ``'-3d'`` or ``'+6m'``) is not included if
+	it is ``True``.  Default value is ``False``.
+
+>>> timestamp_re = re.compile(
+...     gene_timestamp_regex('active', prefix=”),
+...     re.VERBOSE)
+>>> timestamp_re.match('no match')  # returns None
+>>> m = timestamp_re.match('<2010-06-21 Mon>')
+>>> m.group()
+'<2010-06-21 Mon>'
+>>> '{year}-{month}-{day}'.format(**m.groupdict())
+'2010-06-21'
+>>> m = timestamp_re.match('<2005-10-01 Sat 12:30 +7m -3d>')
+>>> from collections import OrderedDict
+>>> sorted(m.groupdict().items())
+... # doctest: +NORMALIZE_WHITESPACE
+[('day', '01'),
+
+	('end_hour', None), ('end_min', None),
+	('hour', '12'), ('min', '30'),
+	('month', '10'),
+	('repeatdwmy', 'm'), ('repeatnum', '7'), ('repeatpre', '+'),
+	('warndwmy', 'd'), ('warnnum', '3'), ('warnpre', '-'), ('year', '2005')]
+
+When “brtype = 'nobrace'“, cookie part cannot be retrieved.
+
+>>> timestamp_re = re.compile(
+...     gene_timestamp_regex('nobrace', prefix=”),
+...     re.VERBOSE)
+>>> timestamp_re.match('no match')  # returns None
+>>> m = timestamp_re.match('2010-06-21 Mon')
+>>> m.group()
+'2010-06-21'
+>>> '{year}-{month}-{day}'.format(**m.groupdict())
+'2010-06-21'
+>>> m = timestamp_re.match('2005-10-01 Sat 12:30 +7m -3d')
+>>> sorted(m.groupdict().items())
+... # doctest: +NORMALIZE_WHITESPACE
+[('day', '01'),
+
+	('end_hour', None), ('end_min', None),
+	('hour', '12'), ('min', '30'),
+	('month', '10'), ('year', '2005')]
+
+"""
 */
 func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) string {
 	bo, bc := "", ""
@@ -378,21 +384,24 @@ func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 
 func lexDeadline(line string, row, col int) (token, bool) {
 	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
-		return token{"deadline", len(m[1]), line, m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"deadline", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
 
 func lexScheduled(line string, row, col int) (token, bool) {
 	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
-		return token{"scheduled", len(m[1]), line, m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"scheduled", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
 
 func lexClosed(line string, row, col int) (token, bool) {
 	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
-		return token{"closed", len(m[1]), line, m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"closed", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }

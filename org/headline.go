@@ -82,7 +82,8 @@ var pdoneRegexp = regexp.MustCompile(`(.*?)\s\[\s*((?P<percent>\d+)%)|((?P<a>\d+
 
 func lexHeadline(line string, row, col int) (token, bool) {
 	if m := headlineRegexp.FindStringSubmatch(line); m != nil {
-		return token{"headline", 0, m[2], m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"headline", 0, m[2], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
@@ -100,7 +101,7 @@ func reMatchParams(re *regexp.Regexp, m []string) (paramsMap map[string]string) 
 
 func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	pos := d.tokens[i].Pos()
-	t, headline := d.tokens[i], Headline{Pos: pos, EndPos: Pos{Row: pos.Row, Col: pos.Col + len(d.tokens[i].content)}}
+	t, headline := d.tokens[i], Headline{Pos: pos, EndPos: d.tokens[i].EndPos()}
 	headline.Lvl = len(t.matches[1])
 
 	headline.Index = d.addHeadline(&headline)

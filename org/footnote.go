@@ -15,7 +15,8 @@ var footnoteDefinitionRegexp = regexp.MustCompile(`^\[fn:([\w-]+)\](\s+(.+)|\s*$
 
 func lexFootnoteDefinition(line string, row, col int) (token, bool) {
 	if m := footnoteDefinitionRegexp.FindStringSubmatch(line); m != nil {
-		return token{"footnoteDefinition", 0, m[1], m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"footnoteDefinition", 0, m[1], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }

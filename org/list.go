@@ -37,9 +37,11 @@ var listItemStatusRegexp = regexp.MustCompile(`\[( |X|-)\]\s`)
 
 func lexList(line string, row, col int) (token, bool) {
 	if m := unorderedListRegexp.FindStringSubmatch(line); m != nil {
-		return token{"unorderedList", len(m[1]), m[4], m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"unorderedList", len(m[1]), m[4], m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := orderedListRegexp.FindStringSubmatch(line); m != nil {
-		return token{"orderedList", len(m[1]), m[5], m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"orderedList", len(m[1]), m[5], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
@@ -128,11 +130,22 @@ func (self DescriptiveListItem) GetPos() Pos { return self.Pos }
 func (self ListItem) GetPos() Pos            { return self.Pos }
 func (self List) GetPos() Pos                { return self.Pos }
 func (self DescriptiveListItem) GetEnd() Pos {
-	return self.Details[len(self.Details)-1].GetEnd()
+	if len(self.Details) > 0 {
+		return self.Details[len(self.Details)-1].GetEnd()
+	}
+	return self.GetPos()
 }
 func (self ListItem) GetEnd() Pos {
-	return self.Children[len(self.Children)-1].GetEnd()
+	fmt.Printf("LIST ITEM %d: %v\n", len(self.Children)-1, self.Children[len(self.Children)-1].String())
+	if len(self.Children) > 0 {
+		return self.Children[len(self.Children)-1].GetEnd()
+	}
+	return self.GetPos()
 }
 func (self List) GetEnd() Pos {
-	return self.Items[len(self.Items)-1].GetEnd()
+	fmt.Printf("List\n")
+	if len(self.Items) > 0 {
+		return self.Items[len(self.Items)-1].GetEnd()
+	}
+	return self.GetPos()
 }

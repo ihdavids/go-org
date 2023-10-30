@@ -39,9 +39,11 @@ var columnAlignAndLengthRegexp = regexp.MustCompile(`^<(l|c|r)?(\d+)?>$`)
 
 func lexTable(line string, row, col int) (token, bool) {
 	if m := tableSeparatorRegexp.FindStringSubmatch(line); m != nil {
-		return token{"tableSeparator", len(m[1]), m[2], m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"tableSeparator", len(m[1]), m[2], m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := tableRowRegexp.FindStringSubmatch(line); m != nil {
-		return token{"tableRow", len(m[1]), m[2], m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"tableRow", len(m[1]), m[2], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }

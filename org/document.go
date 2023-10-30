@@ -71,10 +71,15 @@ type token struct {
 	content string
 	matches []string
 	pos     Pos
+	endPos  Pos
 }
 
 func (self token) Pos() Pos {
 	return self.pos
+}
+
+func (self token) EndPos() Pos {
+	return self.endPos
 }
 
 var lexFns = []lexFn{
@@ -94,7 +99,7 @@ var lexFns = []lexFn{
 	lexClosed,
 }
 
-var nilToken = token{"nil", -1, "", nil, Pos{0, 0}}
+var nilToken = token{"nil", -1, "", nil, Pos{0, 0}, Pos{0, 0}}
 var orgWriter = NewOrgWriter()
 
 // New returns a new Configuration with (hopefully) sane defaults.
@@ -264,7 +269,7 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 	}
 	d.Log.Printf("Could not parse token %#v: Falling back to treating it as plain text.", d.tokens[i])
 	m := plainTextRegexp.FindStringSubmatch(d.tokens[i].matches[0])
-	d.tokens[i] = token{"text", len(m[1]), m[2], m, d.tokens[i].pos}
+	d.tokens[i] = token{"text", len(m[1]), m[2], m, d.tokens[i].pos, computeTextEnd(d.tokens[i].pos, m[2])}
 	return d.parseOne(i, stop)
 }
 

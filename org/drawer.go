@@ -7,12 +7,14 @@ import (
 
 type Drawer struct {
 	Pos      Pos
+	EndPos   Pos
 	Name     string
 	Children []Node
 }
 
 type PropertyDrawer struct {
 	Pos        Pos
+	EndPos     Pos
 	Properties [][]string
 }
 
@@ -22,9 +24,11 @@ var propertyRegexp = regexp.MustCompile(`^(\s*):(\S+):(\s+(.*)$|$)`)
 
 func lexDrawer(line string, row, col int) (token, bool) {
 	if m := endDrawerRegexp.FindStringSubmatch(line); m != nil {
-		return token{"endDrawer", len(m[1]), "", m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"endDrawer", len(m[1]), "", m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := beginDrawerRegexp.FindStringSubmatch(line); m != nil {
-		return token{"beginDrawer", len(m[1]), strings.ToUpper(m[2]), m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"beginDrawer", len(m[1]), strings.ToUpper(m[2]), m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
@@ -41,7 +45,15 @@ func (d *Document) parseDrawer(i int, parentStop stopFn) (int, Node) {
 			return true
 		}
 		kind := d.tokens[i].kind
-		return kind == "beginDrawer" || kind == "endDrawer" || kind == "headline"
+		if kind == "endDrawer" {
+			drawer.EndPos = d.tokens[i].EndPos()
+			return true
+		}
+		if kind == "beginDrawer" || kind == "headline" {
+			drawer.EndPos = d.tokens[i].Pos()
+			return true
+		}
+		return false
 	}
 	for {
 		consumed, nodes := d.parseMany(i, stop)
@@ -50,7 +62,12 @@ func (d *Document) parseDrawer(i int, parentStop stopFn) (int, Node) {
 		if i < len(d.tokens) && d.tokens[i].kind == "beginDrawer" {
 			startPos := d.tokens[i].Pos()
 			content := d.tokens[i].content
-			p := Paragraph{d.tokens[i].Pos(), []Node{Text{startPos, computeTextEnd(startPos, content), ":" + content + ":", false}}}
+			nodes := []Node{Text{startPos, computeTextEnd(startPos, content), ":" + content + ":", false}}
+			end := d.tokens[i].EndPos()
+			if len(nodes) > 0 {
+				end = nodes[len(nodes)-1].GetEnd()
+			}
+			p := Paragraph{d.tokens[i].Pos(), end, nodes}
 			drawer.Children = append(drawer.Children, p)
 			i++
 		} else {
@@ -58,6 +75,7 @@ func (d *Document) parseDrawer(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 	if i < len(d.tokens) && d.tokens[i].kind == "endDrawer" {
+		drawer.EndPos = d.tokens[i].EndPos()
 		i++
 	}
 	return i - start, drawer
@@ -111,8 +129,5 @@ func (n PropertyDrawer) GetEnd() Pos {
 }
 func (n Drawer) GetPos() Pos { return n.Pos }
 func (n Drawer) GetEnd() Pos {
-	if len(n.Children) > 0 {
-		return n.Children[len(n.Children)-1].GetEnd()
-	}
-	return n.GetPos()
+	return n.EndPos
 }

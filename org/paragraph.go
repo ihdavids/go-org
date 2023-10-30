@@ -8,6 +8,7 @@ import (
 
 type Paragraph struct {
 	Pos      Pos
+	EndPos   Pos
 	Children []Node
 }
 type HorizontalRule struct {
@@ -19,14 +20,16 @@ var plainTextRegexp = regexp.MustCompile(`^(\s*)(.*)`)
 
 func lexText(line string, row, col int) (token, bool) {
 	if m := plainTextRegexp.FindStringSubmatch(line); m != nil {
-		return token{"text", len(m[1]), m[2], m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"text", len(m[1]), m[2], m, pos, computeTextEnd(pos, m[1]+m[2])}, true
 	}
 	return nilToken, false
 }
 
 func lexHorizontalRule(line string, row, col int) (token, bool) {
 	if m := horizontalRuleRegexp.FindStringSubmatch(line); m != nil {
-		return token{"horizontalRule", len(m[1]), "", m, Pos{row, col}}, true
+		pos := Pos{row, col}
+		return token{"horizontalRule", len(m[1]), "", m, pos, Pos{row, col + len(m[1])}}, true
 	}
 	return nilToken, false
 }
@@ -41,7 +44,8 @@ func (d *Document) parseParagraph(i int, parentStop stopFn) (int, Node) {
 		lines = append(lines, strings.Repeat(" ", int(lvl))+d.tokens[i].content)
 	}
 	consumed := i - start
-	return consumed, Paragraph{d.tokens[start].Pos(), d.parseInline(strings.Join(lines, "\n"), start)}
+	end := i - 1
+	return consumed, Paragraph{d.tokens[start].Pos(), d.tokens[end].EndPos(), d.parseInline(strings.Join(lines, "\n"), start)}
 }
 
 func (d *Document) parseHorizontalRule(i int, parentStop stopFn) (int, Node) {
@@ -54,5 +58,8 @@ func (n HorizontalRule) GetPos() Pos    { return n.Pos }
 func (n Paragraph) GetPos() Pos         { return n.Pos }
 func (n HorizontalRule) GetEnd() Pos    { return n.Pos }
 func (n Paragraph) GetEnd() Pos {
-	return n.Children[len(n.Children)-1].GetEnd()
+	if len(n.Children) > 0 {
+		return n.Children[len(n.Children)-1].GetEnd()
+	}
+	return n.EndPos
 }
