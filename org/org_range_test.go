@@ -1,6 +1,7 @@
 package org
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -31,4 +32,16 @@ func TestOrgRanges(t *testing.T) {
 		//	fmt.Printf("%v : %v : %v\n", c.GetPos(), c.GetEnd(), c.String())
 		//}
 	}
+}
+
+func TestOrgRangesTable(t *testing.T) {
+	path := "./testrange/table.org"
+	reader := strings.NewReader(fileString(path))
+	d := New().Silent().Parse(reader, path)
+	h := d.Outline.Children[0]
+	// table := h.Headline.Children[0]
+	for _, c := range h.Headline.Children {
+		fmt.Printf("%v : %v : %v\n", c.GetPos(), c.GetEnd(), c.String())
+	}
+	//fmt.Printf("%v vs %v\n", table.GetPos(), table.GetEnd())
 }

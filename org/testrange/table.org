@@ -1,0 +1,5 @@
+* Table
+
+    | Cell A | Cell B | Cell C |
+    | Cell A | Cell B | Cell C |
+    | Cell 1 | Cell 2 | Cell 3 |
