@@ -275,9 +275,15 @@ func (parent *Section) add(current *Section) {
 	}
 }
 
-func (n Headline) String() string { return orgWriter.WriteNodesAsString(n) }
-func (n Headline) GetPos() Pos    { return n.Pos }
-func (n Headline) GetEnd() Pos    { return n.EndPos }
-func (n SDC) String() string      { return orgWriter.WriteNodesAsString(n) }
-func (n SDC) GetPos() Pos         { return n.Pos }
-func (n SDC) GetEnd() Pos         { return n.Pos }
+func (n Headline) String() string   { return orgWriter.WriteNodesAsString(n) }
+func (n Headline) GetPos() Pos      { return n.Pos }
+func (n Headline) GetTokenEnd() Pos { return n.EndPos }
+func (n Headline) GetEnd() Pos {
+	if len(n.Children) > 0 {
+		return n.Children[len(n.Children)-1].GetEnd()
+	}
+	return n.GetTokenEnd()
+}
+func (n SDC) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n SDC) GetPos() Pos    { return n.Pos }
+func (n SDC) GetEnd() Pos    { return n.Pos }

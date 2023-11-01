@@ -136,14 +136,12 @@ func (self DescriptiveListItem) GetEnd() Pos {
 	return self.GetPos()
 }
 func (self ListItem) GetEnd() Pos {
-	fmt.Printf("LIST ITEM %d: %v\n", len(self.Children)-1, self.Children[len(self.Children)-1].String())
 	if len(self.Children) > 0 {
 		return self.Children[len(self.Children)-1].GetEnd()
 	}
 	return self.GetPos()
 }
 func (self List) GetEnd() Pos {
-	fmt.Printf("List\n")
 	if len(self.Items) > 0 {
 		return self.Items[len(self.Items)-1].GetEnd()
 	}

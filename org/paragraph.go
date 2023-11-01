@@ -58,8 +58,5 @@ func (n HorizontalRule) GetPos() Pos    { return n.Pos }
 func (n Paragraph) GetPos() Pos         { return n.Pos }
 func (n HorizontalRule) GetEnd() Pos    { return n.Pos }
 func (n Paragraph) GetEnd() Pos {
-	if len(n.Children) > 0 {
-		return n.Children[len(n.Children)-1].GetEnd()
-	}
 	return n.EndPos
 }
