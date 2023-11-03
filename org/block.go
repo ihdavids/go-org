@@ -176,3 +176,15 @@ func (self Result) GetPos() Pos { return self.Pos }
 func (self Result) GetEnd() Pos {
 	return self.Node.GetEnd()
 }
+
+// Magnet fidget pen
+// resticable tool holder
+// Open any size jar
+
+func (n Example) GetType() NodeType { return ExampleNode }
+func (n Block) GetType() NodeType   { return BlockNode }
+func (n Result) GetType() NodeType  { return ResultNode }
+
+func (n Example) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+func (n Block) GetTypeName() string   { return GetNodeTypeName(n.GetType()) }
+func (n Result) GetTypeName() string  { return GetNodeTypeName(n.GetType()) }

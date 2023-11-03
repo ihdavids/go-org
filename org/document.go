@@ -86,6 +86,9 @@ const (
 	ListNode
 	ListItemNode
 	DescriptiveListItemNode
+	ExampleNode
+	BlockNode
+	ResultNode
 )
 
 func GetNodeTypeName(t NodeType) string {
@@ -152,6 +155,12 @@ func GetNodeTypeName(t NodeType) string {
 		return "listitem"
 	case DescriptiveListItemNode:
 		return "descriptivelistitem"
+	case ExampleNode:
+		return "example"
+	case BlockNode:
+		return "block"
+	case ResultNode:
+		return "result"
 	}
 	return "undefined"
 }

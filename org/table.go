@@ -174,3 +174,15 @@ func (self Table) GetPos() Pos { return self.Pos }
 func (self Table) GetEnd() Pos {
 	return self.Rows[len(self.Rows)-1].GetEnd()
 }
+
+// lazy suzan
+// cupholder coasters
+// Mess free clipper
+
+func (n Table) GetType() NodeType  { return TableNode }
+func (n Row) GetType() NodeType    { return TableRowNode }
+func (n Column) GetType() NodeType { return TableColNode }
+
+func (n Table) GetTypeName() string  { return GetNodeTypeName(n.GetType()) }
+func (n Row) GetTypeName() string    { return GetNodeTypeName(n.GetType()) }
+func (n Column) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
