@@ -56,7 +56,8 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		if t := d.tokens[i]; t.kind == "tableRow" {
 			rawRow := strings.FieldsFunc(d.tokens[i].content, func(r rune) bool { return r == '|' })
 			startPos := d.tokens[i].pos
-			startPos.Col += 1 // increment past separator (this is first cell)
+			// We do not need to do this because we are doing it below!
+			//startPos.Col += 1 // increment past separator (this is first cell)
 			endPos := Pos{Row: startPos.Row, Col: startPos.Col}
 			curStartPos := []Pos{}
 			curEndPos := []Pos{}
@@ -158,7 +159,9 @@ func isSpecialRow(rawColumns []string) bool {
 }
 
 func (self Row) GetEnd() Pos {
-	return self.Columns[len(self.Columns)-1].GetEnd()
+	p := self.Columns[len(self.Columns)-1].GetEnd()
+	p.Col += 1 // include end marker that is skipped
+	return p
 }
 func (self Row) GetPos() Pos {
 	return self.Columns[0].GetPos()

@@ -40,15 +40,42 @@ func TestOrgRangesTable(t *testing.T) {
 	d := New().Silent().Parse(reader, path)
 	h := d.Outline.Children[0]
 	// table := h.Headline.Children[0]
+	starts := ""
+	ends := ""
+	startPos := []Pos{Pos{2, 5}, Pos{2, 14}, Pos{2, 25}, Pos{3, 5}, Pos{3, 14}, Pos{3, 25}, Pos{4, 5}, Pos{4, 14}, Pos{4, 25}}
+	endPos := []Pos{Pos{2, 13}, Pos{2, 24}, Pos{2, 33}, Pos{3, 13}, Pos{3, 24}, Pos{3, 33}, Pos{4, 13}, Pos{4, 24}, Pos{4, 33}}
+	tableStart := Pos{2, 4}
+	tableEnd := Pos{4, 34}
 	for _, c := range h.Headline.Children {
 		if c.GetType() == TableNode {
-			fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
-			t := c.(Table)
-			for _, r := range t.Rows {
-				for _, col := range r.Columns {
-					fmt.Printf("%v %v", col.GetPos(), col.GetEnd())
+			if c.GetPos() != tableStart {
+				t.Errorf("Table start does not match up! %v vs %v", c.GetPos(), tableStart)
+			}
+			if c.GetEnd() != tableEnd {
+				t.Errorf("Table end does not match up! %v vs %v", c.GetEnd(), tableEnd)
+			}
+			//fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
+			tbl := c.(Table)
+			for ridx, r := range tbl.Rows {
+				for cidx, col := range r.Columns {
+					starts += fmt.Sprintf("%v,", col.GetPos())
+					ends += fmt.Sprintf("%v,", col.GetEnd())
+					s := col.GetPos()
+					e := col.GetEnd()
+					tsp := startPos[cidx]
+					tsp.Row = 2 + ridx
+					tep := endPos[cidx]
+					tep.Row = 2 + ridx
+					if tsp != s {
+						t.Errorf("START CELL %d,%d does not match up %v vs %v\n", ridx, cidx, s, tsp)
+					}
+					if tep != e {
+						t.Errorf("END CELL %d,%d does not match up %v vs %v\n", ridx, cidx, e, tep)
+					}
 				}
 			}
+			//fmt.Printf("%v\n", starts)
+			//fmt.Printf("%v\n", ends)
 		}
 	}
 	//fmt.Printf("%v vs %v\n", table.GetPos(), table.GetEnd())
