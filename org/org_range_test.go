@@ -102,6 +102,10 @@ func TestOrgRangesList(t *testing.T) {
 			if c.GetEnd() != objEnd {
 				t.Errorf("List end does not match up! %v vs %v", c.GetEnd(), objEnd)
 			}
+			lst := c.(List)
+			for idx, li := range lst.Items {
+				fmt.Printf("%d: [%v %v]\n", idx, li.GetPos(), li.GetEnd())
+			}
 		} else if c.GetType() != ParagraphNode {
 			t.Errorf("Invalid node type: %v\n", c.GetTypeName())
 			//fmt.Printf("%v\n", c.GetTypeName())
