@@ -219,3 +219,15 @@ func (n NodeWithName) GetEnd() Pos { return n.Node.GetEnd() }
 func (n NodeWithMeta) GetEnd() Pos { return n.Node.GetEnd() } // Metadata precedes the node, so ignore
 func (n Comment) GetEnd() Pos      { return n.EndPos }
 func (n Keyword) GetEnd() Pos      { return n.EndPos }
+
+func (n Comment) GetType() NodeType      { return CommentNode }
+func (n Keyword) GetType() NodeType      { return KeywordNode }
+func (n NodeWithMeta) GetType() NodeType { return NodeWithMetaNode }
+func (n NodeWithName) GetType() NodeType { return NodeWithNameNode }
+func (n Include) GetType() NodeType      { return IncludeNode }
+
+func (n Comment) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
+func (n Keyword) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
+func (n NodeWithMeta) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+func (n NodeWithName) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+func (n Include) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }

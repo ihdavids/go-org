@@ -287,3 +287,8 @@ func (n Headline) GetEnd() Pos {
 func (n SDC) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n SDC) GetPos() Pos    { return n.Pos }
 func (n SDC) GetEnd() Pos    { return n.Pos }
+
+func (n SDC) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
+func (n SDC) GetType() NodeType        { return SDCNode }
+func (n Headline) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+func (n Headline) GetType() NodeType   { return HeadlineNode }

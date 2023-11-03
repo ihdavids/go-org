@@ -56,7 +56,7 @@ const (
 	// since iota starts with 0, the first value
 	// defined here will be the default
 	UndefinedNode NodeType = iota
-	HealineNode
+	HeadlineNode
 	DateTimeNode
 	TableNode
 	TableRowNode
@@ -77,13 +77,19 @@ const (
 	MacroNode
 	TimestampNode
 	FootnoteDefinitionNode
+	SDCNode
+	CommentNode
+	KeywordNode
+	NodeWithMetaNode
+	NodeWithNameNode
+	IncludeNode
 )
 
 func GetNodeTypeName(t NodeType) string {
 	switch t {
 	case UndefinedNode:
 		return "undefined"
-	case HealineNode:
+	case HeadlineNode:
 		return "headline"
 	case DateTimeNode:
 		return "datetime"
@@ -125,6 +131,18 @@ func GetNodeTypeName(t NodeType) string {
 		return "timestamp"
 	case FootnoteDefinitionNode:
 		return "footnotedef"
+	case SDCNode:
+		return "sdc"
+	case CommentNode:
+		return "comment"
+	case KeywordNode:
+		return "keyword"
+	case NodeWithMetaNode:
+		return "nodewithmeta"
+	case NodeWithNameNode:
+		return "nodewithname"
+	case IncludeNode:
+		return "include"
 	}
 	return "undefined"
 }
