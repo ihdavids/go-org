@@ -131,3 +131,8 @@ func (n Drawer) GetPos() Pos { return n.Pos }
 func (n Drawer) GetEnd() Pos {
 	return n.EndPos
 }
+
+func (n Drawer) GetType() NodeType           { return DrawerNode }
+func (n Drawer) GetTypeName() string         { return GetNodeTypeName(n.GetType()) }
+func (n PropertyDrawer) GetType() NodeType   { return PropertyDrawerNode }
+func (n PropertyDrawer) GetTypeName() string { return GetNodeTypeName(n.GetType()) }

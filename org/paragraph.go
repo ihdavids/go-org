@@ -60,3 +60,7 @@ func (n HorizontalRule) GetEnd() Pos    { return n.Pos }
 func (n Paragraph) GetEnd() Pos {
 	return n.EndPos
 }
+func (n Paragraph) GetType() NodeType        { return ParagraphNode }
+func (n Paragraph) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
+func (n HorizontalRule) GetType() NodeType   { return HorizontalRuleNode }
+func (n HorizontalRule) GetTypeName() string { return GetNodeTypeName(n.GetType()) }

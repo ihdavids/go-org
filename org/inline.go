@@ -524,3 +524,29 @@ func (n Macro) GetEnd() Pos {
 func (n Timestamp) GetEnd() Pos {
 	return n.EndPos
 }
+
+/////
+
+func (n Text) GetType() NodeType              { return TextNode }
+func (n LineBreak) GetType() NodeType         { return LineBreakNode }
+func (n ExplicitLineBreak) GetType() NodeType { return ExplicitLineBreakNode }
+func (n StatisticToken) GetType() NodeType    { return StatisticTokenNode }
+func (n Emphasis) GetType() NodeType          { return EmphasisNode }
+func (n InlineBlock) GetType() NodeType       { return InlineBlockNode }
+func (n LatexFragment) GetType() NodeType     { return LatexFragmentNode }
+func (n FootnoteLink) GetType() NodeType      { return FootnoteLinkNode }
+func (n RegularLink) GetType() NodeType       { return RegularLinkNode }
+func (n Macro) GetType() NodeType             { return MacroNode }
+func (n Timestamp) GetType() NodeType         { return TimestampNode }
+
+func (n Text) GetTypeName() string              { return GetNodeTypeName(n.GetType()) }
+func (n LineBreak) GetTypeName() string         { return GetNodeTypeName(n.GetType()) }
+func (n ExplicitLineBreak) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+func (n StatisticToken) GetTypeName() string    { return GetNodeTypeName(n.GetType()) }
+func (n Emphasis) GetTypeName() string          { return GetNodeTypeName(n.GetType()) }
+func (n InlineBlock) GetTypeName() string       { return GetNodeTypeName(n.GetType()) }
+func (n LatexFragment) GetTypeName() string     { return GetNodeTypeName(n.GetType()) }
+func (n FootnoteLink) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
+func (n RegularLink) GetTypeName() string       { return GetNodeTypeName(n.GetType()) }
+func (n Macro) GetTypeName() string             { return GetNodeTypeName(n.GetType()) }
+func (n Timestamp) GetTypeName() string         { return GetNodeTypeName(n.GetType()) }

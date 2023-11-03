@@ -42,7 +42,7 @@ func lexTable(line string, row, col int) (token, bool) {
 		pos := Pos{row, col}
 		return token{"tableSeparator", len(m[1]), m[2], m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := tableRowRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
+		pos := Pos{row, col + len(m[1])}
 		return token{"tableRow", len(m[1]), m[2], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
@@ -56,11 +56,13 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		if t := d.tokens[i]; t.kind == "tableRow" {
 			rawRow := strings.FieldsFunc(d.tokens[i].content, func(r rune) bool { return r == '|' })
 			startPos := d.tokens[i].pos
+			startPos.Col += 1 // increment past separator (this is first cell)
 			endPos := Pos{Row: startPos.Row, Col: startPos.Col}
 			curStartPos := []Pos{}
 			curEndPos := []Pos{}
 			for i := range rawRow {
 				startPos = endPos
+				startPos.Col += 1 // increment past separator (for this cell)
 				endPos = Pos{Row: startPos.Row, Col: startPos.Col + len(rawRow[i])}
 				rawRow[i] = strings.TrimSpace(rawRow[i])
 				curStartPos = append(curStartPos, startPos)

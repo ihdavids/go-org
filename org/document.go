@@ -50,11 +50,89 @@ type Document struct {
 	currentHeadline *Headline
 }
 
+type NodeType int
+
+const (
+	// since iota starts with 0, the first value
+	// defined here will be the default
+	UndefinedNode NodeType = iota
+	HealineNode
+	DateTimeNode
+	TableNode
+	TableRowNode
+	TableColNode
+	ParagraphNode
+	HorizontalRuleNode
+	DrawerNode
+	PropertyDrawerNode
+	TextNode
+	LineBreakNode
+	ExplicitLineBreakNode
+	StatisticTokenNode
+	EmphasisNode
+	InlineBlockNode
+	LatexFragmentNode
+	FootnoteLinkNode
+	RegularLinkNode
+	MacroNode
+	TimestampNode
+)
+
+func GetNodeTypeName(t NodeType) string {
+	switch t {
+	case UndefinedNode:
+		return "undefined"
+	case HealineNode:
+		return "headline"
+	case DateTimeNode:
+		return "datetime"
+	case TableNode:
+		return "table"
+	case TableRowNode:
+		return "tablerow"
+	case TableColNode:
+		return "tablecol"
+	case ParagraphNode:
+		return "paragraph"
+	case HorizontalRuleNode:
+		return "horizontalrule"
+	case DrawerNode:
+		return "drawer"
+	case PropertyDrawerNode:
+		return "propeprtydrawer"
+	case TextNode:
+		return "text"
+	case LineBreakNode:
+		return "linebreak"
+	case ExplicitLineBreakNode:
+		return "explicitlinebreak"
+	case StatisticTokenNode:
+		return "statistictoken"
+	case EmphasisNode:
+		return "emphasis"
+	case InlineBlockNode:
+		return "inlineblock"
+	case LatexFragmentNode:
+		return "latex"
+	case FootnoteLinkNode:
+		return "footnotelink"
+	case RegularLinkNode:
+		return "link"
+	case MacroNode:
+		return "macro"
+	case TimestampNode:
+		return "timestamp"
+	}
+	return "undefined"
+}
+
 // Node represents a parsed node of the document.
 type Node interface {
-	String() string // String returns the pretty printed Org mode string for the node (see OrgWriter).
-	GetPos() Pos    // Position in the file of the token
-	GetEnd() Pos    // Position of next token in stream
+	String() string      // String returns the pretty printed Org mode string for the node (see OrgWriter).
+	GetPos() Pos         // Position in the file of the token
+	GetEnd() Pos         // Position of next token in stream
+	GetType() NodeType   // What type of node are we?
+	GetTypeName() string // Descriptive name of node type
 }
 
 type lexFn = func(line string, row, col int) (t token, ok bool)
