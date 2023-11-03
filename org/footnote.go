@@ -42,3 +42,6 @@ func (n FootnoteDefinition) GetEnd() Pos {
 	}
 	return n.GetPos()
 }
+
+func (n FootnoteDefinition) GetType() NodeType   { return FootnoteDefinitionNode }
+func (n FootnoteDefinition) GetTypeName() string { return GetNodeTypeName(n.GetType()) }

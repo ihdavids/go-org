@@ -76,6 +76,7 @@ const (
 	RegularLinkNode
 	MacroNode
 	TimestampNode
+	FootnoteDefinitionNode
 )
 
 func GetNodeTypeName(t NodeType) string {
@@ -122,6 +123,8 @@ func GetNodeTypeName(t NodeType) string {
 		return "macro"
 	case TimestampNode:
 		return "timestamp"
+	case FootnoteDefinitionNode:
+		return "footnotedef"
 	}
 	return "undefined"
 }
