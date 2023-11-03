@@ -147,3 +147,11 @@ func (self List) GetEnd() Pos {
 	}
 	return self.GetPos()
 }
+
+func (n List) GetType() NodeType                { return ListNode }
+func (n ListItem) GetType() NodeType            { return ListItemNode }
+func (n DescriptiveListItem) GetType() NodeType { return DescriptiveListItemNode }
+
+func (n List) GetTypeName() string                { return GetNodeTypeName(n.GetType()) }
+func (n ListItem) GetTypeName() string            { return GetNodeTypeName(n.GetType()) }
+func (n DescriptiveListItem) GetTypeName() string { return GetNodeTypeName(n.GetType()) }

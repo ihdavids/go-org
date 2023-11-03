@@ -83,6 +83,9 @@ const (
 	NodeWithMetaNode
 	NodeWithNameNode
 	IncludeNode
+	ListNode
+	ListItemNode
+	DescriptiveListItemNode
 )
 
 func GetNodeTypeName(t NodeType) string {
@@ -143,6 +146,12 @@ func GetNodeTypeName(t NodeType) string {
 		return "nodewithname"
 	case IncludeNode:
 		return "include"
+	case ListNode:
+		return "list"
+	case ListItemNode:
+		return "listitem"
+	case DescriptiveListItemNode:
+		return "descriptivelistitem"
 	}
 	return "undefined"
 }
