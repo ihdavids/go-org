@@ -80,3 +80,34 @@ func TestOrgRangesTable(t *testing.T) {
 	}
 	//fmt.Printf("%v vs %v\n", table.GetPos(), table.GetEnd())
 }
+
+func TestOrgRangesList(t *testing.T) {
+	path := "./testrange/list.org"
+	reader := strings.NewReader(fileString(path))
+	d := New().Silent().Parse(reader, path)
+	h := d.Outline.Children[0]
+	// table := h.Headline.Children[0]
+	//starts := ""
+	//ends := ""
+	//startPos := []Pos{Pos{2, 5}, Pos{2, 14}, Pos{2, 25}, Pos{3, 5}, Pos{3, 14}, Pos{3, 25}, Pos{4, 5}, Pos{4, 14}, Pos{4, 25}}
+	//endPos := []Pos{Pos{2, 13}, Pos{2, 24}, Pos{2, 33}, Pos{3, 13}, Pos{3, 24}, Pos{3, 33}, Pos{4, 13}, Pos{4, 24}, Pos{4, 33}}
+	objStart := Pos{3, 4}
+	objEnd := Pos{7, 29} // This may not be right might need to be 30??!
+	for _, c := range h.Headline.Children {
+		//fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
+		if c.GetType() == ListNode {
+			if c.GetPos() != objStart {
+				t.Errorf("List start does not match up! %v vs %v", c.GetPos(), objStart)
+			}
+			if c.GetEnd() != objEnd {
+				t.Errorf("List end does not match up! %v vs %v", c.GetEnd(), objEnd)
+			}
+		} else if c.GetType() != ParagraphNode {
+			t.Errorf("Invalid node type: %v\n", c.GetTypeName())
+			//fmt.Printf("%v\n", c.GetTypeName())
+		}
+		/*
+			tbl := c.(Table)
+		*/
+	}
+}

@@ -38,9 +38,11 @@ var listItemStatusRegexp = regexp.MustCompile(`\[( |X|-)\]\s`)
 func lexList(line string, row, col int) (token, bool) {
 	if m := unorderedListRegexp.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col}
+		pos.Col += len(m[1])
 		return token{"unorderedList", len(m[1]), m[4], m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := orderedListRegexp.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col}
+		pos.Col += len(m[1])
 		return token{"orderedList", len(m[1]), m[5], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
