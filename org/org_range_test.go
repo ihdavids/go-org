@@ -41,11 +41,13 @@ func TestOrgRangesTable(t *testing.T) {
 	h := d.Outline.Children[0]
 	// table := h.Headline.Children[0]
 	for _, c := range h.Headline.Children {
-		fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
-		t := c.(Table)
-		for _, r := range t.Rows {
-			for _, col := range r.Columns {
-				fmt.Printf("%v %v", col.GetPos(), col.GetEnd())
+		if c.GetType() == TableNode {
+			fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
+			t := c.(Table)
+			for _, r := range t.Rows {
+				for _, col := range r.Columns {
+					fmt.Printf("%v %v", col.GetPos(), col.GetEnd())
+				}
 			}
 		}
 	}
