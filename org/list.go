@@ -120,7 +120,7 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 			return true
 		}
 		t := d.tokens[i]
-		return t.lvl < minIndent && !(t.kind == "text" && t.content == "")
+		return t.lvl < minIndent && !(t.kind == "text" && len(strings.TrimSpace(t.content)) == 0)
 	}
 	for !stop(d, i) && (i <= start+1 || !isSecondBlankLine(d, i)) {
 		consumed, node := d.parseOne(i, stop)

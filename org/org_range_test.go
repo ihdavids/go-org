@@ -93,22 +93,55 @@ func TestOrgRangesList(t *testing.T) {
 		//fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
 		if c.GetType() == ListNode {
 			if c.GetPos() != objStart {
-				t.Errorf("List start does not match up! %v vs %v", c.GetPos(), objStart)
+				t.Errorf("List start does not match up! %v vs %v\n%v", c.GetPos(), objStart, c.String())
 			}
 			if c.GetEnd() != objEnd {
-				t.Errorf("List end does not match up! %v vs %v", c.GetEnd(), objEnd)
+				t.Errorf("List end does not match up! %v vs %v\n%v", c.GetEnd(), objEnd, c.String())
 			}
 			lst := c.(List)
 			for idx, li := range lst.Items {
 				res := pList[idx]
 				if res[0] != li.GetPos() {
-					t.Errorf("%d: List item does not match range %v vs %v", idx, li.GetPos(), res[0])
+					t.Errorf("%d: List item does not match range %v vs %v\n%v", idx, li.GetPos(), res[0], li.String())
 				}
 				if res[1] != li.GetEnd() {
-					t.Errorf("%d: End List item does not match range %v vs %v", idx, li.GetEnd(), res[1])
+					t.Errorf("%d: End List item does not match range %v vs %v\n%v", idx, li.GetEnd(), res[1], li.String())
 				}
 				//fmt.Printf("%d: [%v %v]\n", idx, li.GetPos(), li.GetEnd())
 			}
+			break
+		} else if c.GetType() != ParagraphNode {
+			t.Errorf("Invalid node type: %v\n", c.GetTypeName())
+			//fmt.Printf("%v\n", c.GetTypeName())
+		}
+	}
+	return
+	// Numbered list
+	h = d.Outline.Children[1]
+	objStart = Pos{3, 4}
+	objEnd = Pos{7, 30} // This may not be right might need to be 30??!
+	pList = [][]Pos{[]Pos{Pos{3, 4}, {3, 22}}, []Pos{{4, 4}, {4, 23}}, []Pos{{5, 4}, {7, 30}}}
+	for _, c := range h.Headline.Children {
+		fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
+		if c.GetType() == ListNode {
+			if c.GetPos() != objStart {
+				t.Errorf("List start does not match up! %v vs %v\n%v", c.GetPos(), objStart, c.String())
+			}
+			if c.GetEnd() != objEnd {
+				t.Errorf("List end does not match up! %v vs %v\n%v", c.GetEnd(), objEnd, c.String())
+			}
+			lst := c.(List)
+			for idx, li := range lst.Items {
+				res := pList[idx]
+				fmt.Printf("%d: [%v %v]\n", idx, li.GetPos(), li.GetEnd())
+				if res[0] != li.GetPos() {
+					t.Errorf("%d: List item does not match range %v vs %v\n%v", idx, li.GetPos(), res[0], li.String())
+				}
+				if res[1] != li.GetEnd() {
+					t.Errorf("%d: End List item does not match range %v vs %v\n%v", idx, li.GetEnd(), res[1], li.String())
+				}
+			}
+			break
 		} else if c.GetType() != ParagraphNode {
 			t.Errorf("Invalid node type: %v\n", c.GetTypeName())
 			//fmt.Printf("%v\n", c.GetTypeName())
