@@ -210,10 +210,10 @@ var lexFns = []lexFn{
 	lexKeywordOrComment,
 	lexFootnoteDefinition,
 	lexExample,
-	lexText,
 	lexScheduled,
 	lexDeadline,
 	lexClosed,
+	lexText,
 }
 
 var nilToken = token{"nil", -1, "", nil, Pos{0, 0}, Pos{0, 0}}

@@ -385,22 +385,25 @@ func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 func lexDeadline(line string, row, col int) (token, bool) {
 	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col}
+		pos.Row += len(m[1])
 		return token{"deadline", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
 
 func lexScheduled(line string, row, col int) (token, bool) {
-	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
+	if m := OrgDateScheduled.Re.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col}
+		pos.Col += len(m[1])
 		return token{"scheduled", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
 
 func lexClosed(line string, row, col int) (token, bool) {
-	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
+	if m := OrgDateClosed.Re.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col}
+		pos.Col += len(m[1])
 		return token{"closed", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
