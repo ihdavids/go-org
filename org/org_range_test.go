@@ -86,13 +86,9 @@ func TestOrgRangesList(t *testing.T) {
 	reader := strings.NewReader(fileString(path))
 	d := New().Silent().Parse(reader, path)
 	h := d.Outline.Children[0]
-	// table := h.Headline.Children[0]
-	//starts := ""
-	//ends := ""
-	//startPos := []Pos{Pos{2, 5}, Pos{2, 14}, Pos{2, 25}, Pos{3, 5}, Pos{3, 14}, Pos{3, 25}, Pos{4, 5}, Pos{4, 14}, Pos{4, 25}}
-	//endPos := []Pos{Pos{2, 13}, Pos{2, 24}, Pos{2, 33}, Pos{3, 13}, Pos{3, 24}, Pos{3, 33}, Pos{4, 13}, Pos{4, 24}, Pos{4, 33}}
 	objStart := Pos{3, 4}
-	objEnd := Pos{7, 29} // This may not be right might need to be 30??!
+	objEnd := Pos{7, 30} // This may not be right might need to be 30??!
+	pList := [][]Pos{[]Pos{Pos{3, 4}, {3, 22}}, []Pos{{4, 4}, {4, 23}}, []Pos{{5, 4}, {7, 30}}}
 	for _, c := range h.Headline.Children {
 		//fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
 		if c.GetType() == ListNode {
@@ -104,14 +100,18 @@ func TestOrgRangesList(t *testing.T) {
 			}
 			lst := c.(List)
 			for idx, li := range lst.Items {
+				res := pList[idx]
+				if res[0] != li.GetPos() {
+					t.Errorf("%d: List item does not match range %v vs %v", idx, li.GetPos(), res[0])
+				}
+				if res[1] != li.GetEnd() {
+					t.Errorf("%d: End List item does not match range %v vs %v", idx, li.GetEnd(), res[1])
+				}
 				fmt.Printf("%d: [%v %v]\n", idx, li.GetPos(), li.GetEnd())
 			}
 		} else if c.GetType() != ParagraphNode {
 			t.Errorf("Invalid node type: %v\n", c.GetTypeName())
 			//fmt.Printf("%v\n", c.GetTypeName())
 		}
-		/*
-			tbl := c.(Table)
-		*/
 	}
 }

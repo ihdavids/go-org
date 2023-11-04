@@ -106,12 +106,15 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 	}
 
 	pos := d.tokens[start].Pos() // This is not right!
+	pos = Pos{Row: pos.Row, Col: pos.Col}
 	if d.tokens[start].kind == "text" {
 		if tok, ok := lexList(d.tokens[start].content, pos.Row, pos.Col); ok {
 			pos = tok.pos
 		}
 	}
 	d.tokens[i] = tokenize(strings.Repeat(" ", minIndent)+content, d.tokens[i].Pos().Row)
+	d.tokens[i].pos.Col += 1
+	d.tokens[i].endPos.Col += 1
 	stop := func(d *Document, i int) bool {
 		if parentStop(d, i) {
 			return true
