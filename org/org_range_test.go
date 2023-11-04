@@ -174,14 +174,14 @@ func TestOrgRangesSDC(t *testing.T) {
 	reader := strings.NewReader(fileString(path))
 	d := New().Silent().Parse(reader, path)
 	h := d.Outline.Children[0]
-	objStart := Pos{1, 2}
-	objEnd := Pos{4, 7}
+	objStart := Pos{1, 4}
+	objEnd := Pos{1, 37}
 	c := h.Headline.Scheduled
 	if c.GetPos() != objStart {
-		t.Errorf("Drawer start does not match up! %v vs %v", c.GetPos(), objStart)
+		t.Errorf("Scheduled start does not match up! %v vs %v", c.GetPos(), objStart)
 	}
 	if c.GetEnd() != objEnd {
-		t.Errorf("Drawer end does not match up! %v vs %v", c.GetEnd(), objEnd)
+		t.Errorf("Scheduled end does not match up! %v vs %v", c.GetEnd(), objEnd)
 	}
 	//fmt.Printf("%v : %v - %v\n%v\n", c.GetPos(), c.GetEnd(), c.GetTypeName(), c.String())
 }

@@ -184,6 +184,7 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 
 type SDC struct {
 	Pos      Pos
+	EndPos   Pos
 	Date     *OrgDate
 	DateType DateType
 }
@@ -194,7 +195,7 @@ func (self *SDC) IsZero() bool {
 
 func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
-	sdc := SDC{d.tokens[i].Pos(), s, dt}
+	sdc := SDC{d.tokens[i].Pos(), d.tokens[i].EndPos(), s, dt}
 	if d.Outline.last != nil && d.Outline.last.Headline != nil {
 		d.Outline.last.Headline.Scheduled = &sdc
 	}
@@ -202,7 +203,7 @@ func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
 }
 func (d *Document) parseDeadline(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
-	sdc := SDC{d.tokens[i].Pos(), s, dt}
+	sdc := SDC{d.tokens[i].Pos(), d.tokens[i].EndPos(), s, dt}
 	if d.Outline.last != nil && d.Outline.last.Headline != nil {
 		d.Outline.last.Headline.Deadline = &sdc
 	}
@@ -210,7 +211,7 @@ func (d *Document) parseDeadline(i int, parentStop stopFn) (int, Node) {
 }
 func (d *Document) parseClosed(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
-	sdc := SDC{d.tokens[i].Pos(), s, dt}
+	sdc := SDC{d.tokens[i].Pos(), d.tokens[i].EndPos(), s, dt}
 	if d.Outline.last != nil && d.Outline.last.Headline != nil {
 		d.Outline.last.Headline.Closed = &sdc
 	}
@@ -286,7 +287,7 @@ func (n Headline) GetEnd() Pos {
 }
 func (n SDC) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n SDC) GetPos() Pos    { return n.Pos }
-func (n SDC) GetEnd() Pos    { return n.Pos }
+func (n SDC) GetEnd() Pos    { return n.EndPos }
 
 func (n SDC) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
 func (n SDC) GetType() NodeType        { return SDCNode }

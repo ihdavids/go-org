@@ -1,8 +1,8 @@
 * Schedule
-SCHEDULED: <2023-10-30 Mon 12:34>
+    SCHEDULED: <2023-10-30 Mon 12:34>
 
 * Deadline
-DEADLINE: <2023-10-30 Mon 12:34>
+    DEADLINE: <2023-10-30 Mon 12:34>
 
 * Time
     <2023-10-30 Mon 12:34>
