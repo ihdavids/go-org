@@ -1,0 +1,5 @@
+* Drawer Test
+  :PROPERTIES:
+    :TEST: something
+    :TEST2: something2
+  :END:

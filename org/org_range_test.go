@@ -107,11 +107,31 @@ func TestOrgRangesList(t *testing.T) {
 				if res[1] != li.GetEnd() {
 					t.Errorf("%d: End List item does not match range %v vs %v", idx, li.GetEnd(), res[1])
 				}
-				fmt.Printf("%d: [%v %v]\n", idx, li.GetPos(), li.GetEnd())
+				//fmt.Printf("%d: [%v %v]\n", idx, li.GetPos(), li.GetEnd())
 			}
 		} else if c.GetType() != ParagraphNode {
 			t.Errorf("Invalid node type: %v\n", c.GetTypeName())
 			//fmt.Printf("%v\n", c.GetTypeName())
 		}
 	}
+}
+
+func TestOrgRangesDrawer(t *testing.T) {
+	path := "./testrange/drawer.org"
+	reader := strings.NewReader(fileString(path))
+	d := New().Silent().Parse(reader, path)
+	h := d.Outline.Children[0]
+	objStart := Pos{1, 2}
+	objEnd := Pos{4, 7}
+	c := h.Headline.Properties
+	if c.GetPos() != objStart {
+		t.Errorf("Drawer start does not match up! %v vs %v", c.GetPos(), objStart)
+	}
+	if c.GetEnd() != objEnd {
+		t.Errorf("Drawer end does not match up! %v vs %v", c.GetEnd(), objEnd)
+	}
+	if len(c.Properties) != 2 {
+		t.Errorf("Properties count does not match up! %d vs %d", len(c.Properties), 2)
+	}
+	//fmt.Printf("%v : %v - %v\n%v\n", c.GetPos(), c.GetEnd(), c.GetTypeName(), c.String())
 }

@@ -24,10 +24,10 @@ var propertyRegexp = regexp.MustCompile(`^(\s*):(\S+):(\s+(.*)$|$)`)
 
 func lexDrawer(line string, row, col int) (token, bool) {
 	if m := endDrawerRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
+		pos := Pos{row, col + len(m[1])}
 		return token{"endDrawer", len(m[1]), "", m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := beginDrawerRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
+		pos := Pos{row, col + len(m[1])}
 		return token{"beginDrawer", len(m[1]), strings.ToUpper(m[2]), m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
@@ -96,6 +96,7 @@ func (d *Document) parsePropertyDrawer(i int, parentStop stopFn) (int, Node) {
 		drawer.Properties = append(drawer.Properties, []string{k, v})
 	}
 	if i < len(d.tokens) && d.tokens[i].kind == "endDrawer" {
+		drawer.EndPos = d.tokens[i].EndPos()
 		i++
 	} else {
 		return 0, nil
@@ -119,13 +120,7 @@ func (n Drawer) String() string         { return orgWriter.WriteNodesAsString(n)
 func (n PropertyDrawer) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n PropertyDrawer) GetPos() Pos    { return n.Pos }
 func (n PropertyDrawer) GetEnd() Pos {
-	if len(n.Properties) > 0 {
-		cnt := len(n.Properties)
-		pos := n.GetPos()
-		pos.Row += cnt
-		return pos
-	}
-	return n.GetPos()
+	return n.EndPos
 }
 func (n Drawer) GetPos() Pos { return n.Pos }
 func (n Drawer) GetEnd() Pos {
