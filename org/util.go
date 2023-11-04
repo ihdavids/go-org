@@ -1,11 +1,13 @@
 package org
 
+import "strings"
+
 func isSecondBlankLine(d *Document, i int) bool {
 	if i-1 <= 0 {
 		return false
 	}
 	t1, t2 := d.tokens[i-1], d.tokens[i]
-	if t1.kind == "text" && t2.kind == "text" && t1.content == "" && t2.content == "" {
+	if t1.kind == "text" && t2.kind == "text" && len(strings.TrimSpace(t1.content)) == 0 && len(strings.TrimSpace(t2.content)) == 0 {
 		return true
 	}
 	return false
