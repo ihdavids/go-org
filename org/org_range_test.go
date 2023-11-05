@@ -236,3 +236,25 @@ func TestOrgRangesBlock(t *testing.T) {
 		}
 	}
 }
+
+func TestOrgRangesResult(t *testing.T) {
+	path := "./testrange/result.org"
+	reader := strings.NewReader(fileString(path))
+	d := New().Silent().Parse(reader, path)
+	h := d.Outline.Children[0]
+	objStart := Pos{7, 4}
+	objEnd := Pos{8, 15}
+	for _, c := range h.Headline.Children {
+		//fmt.Printf("%v : %v - %v\n%v\n", c.GetPos(), c.GetEnd(), c.GetTypeName(), c.String())
+		if c.GetType() == BlockNode {
+			b := c.(Block)
+			r := b.Result
+			if r.GetPos() != objStart {
+				t.Errorf("Result start does not match up! %v vs %v", r.GetPos(), objStart)
+			}
+			if r.GetEnd() != objEnd {
+				t.Errorf("Result end does not match up! %v vs %v", r.GetEnd(), objEnd)
+			}
+		}
+	}
+}

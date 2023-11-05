@@ -202,8 +202,8 @@ func (self token) EndPos() Pos {
 var lexFns = []lexFn{
 	lexHeadline,
 	lexDrawer,
-	lexBlock,
 	lexResult,
+	lexBlock,
 	lexList,
 	lexTable,
 	lexHorizontalRule,
