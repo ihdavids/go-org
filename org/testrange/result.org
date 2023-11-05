@@ -1,0 +1,9 @@
+
+* Result
+
+    #+BEGIN_SRC python
+    print("Hello World")
+    #+END_SRC
+
+    #+RESULTS:
+    Hello World

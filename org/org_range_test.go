@@ -185,3 +185,54 @@ func TestOrgRangesSDC(t *testing.T) {
 	}
 	//fmt.Printf("%v : %v - %v\n%v\n", c.GetPos(), c.GetEnd(), c.GetTypeName(), c.String())
 }
+
+func TestOrgRangesText(t *testing.T) {
+	path := "./testrange/text.org"
+	reader := strings.NewReader(fileString(path))
+	d := New().Silent().Parse(reader, path)
+	h := d.Outline.Children[0]
+	objStart := Pos{1, 0}
+	objEnd := Pos{4, 8}
+	c := h.Headline.Children[0]
+	if c.GetPos() != objStart {
+		t.Errorf("Text start does not match up! %v vs %v", c.GetPos(), objStart)
+	}
+	if c.GetEnd() != objEnd {
+		t.Errorf("Text end does not match up! %v vs %v", c.GetEnd(), objEnd)
+	}
+	//fmt.Printf("%v : %v - %v\n%v\n", c.GetPos(), c.GetEnd(), c.GetTypeName(), c.String())
+}
+
+func TestOrgRangesBlock(t *testing.T) {
+	path := "./testrange/block.org"
+	reader := strings.NewReader(fileString(path))
+	d := New().Silent().Parse(reader, path)
+	h := d.Outline.Children[0]
+	objStart := Pos{2, 4}
+	objEnd := Pos{7, 13}
+	for _, c := range h.Headline.Children {
+		if c.GetType() == BlockNode {
+			if c.GetPos() != objStart {
+				t.Errorf("Block start does not match up! %v vs %v", c.GetPos(), objStart)
+			}
+			if c.GetEnd() != objEnd {
+				t.Errorf("Block end does not match up! %v vs %v", c.GetEnd(), objEnd)
+			}
+			//fmt.Printf("%v : %v - %v\n%v\n", c.GetPos(), c.GetEnd(), c.GetTypeName(), c.String())
+		}
+	}
+	h = d.Outline.Children[1]
+	objStart = Pos{11, 4}
+	objEnd = Pos{13, 13}
+	for _, c := range h.Headline.Children {
+		if c.GetType() == BlockNode {
+			if c.GetPos() != objStart {
+				t.Errorf("Block2 start does not match up! %v vs %v", c.GetPos(), objStart)
+			}
+			if c.GetEnd() != objEnd {
+				t.Errorf("Block2 end does not match up! %v vs %v", c.GetEnd(), objEnd)
+			}
+			//fmt.Printf("%v : %v - %v\n%v\n", c.GetPos(), c.GetEnd(), c.GetTypeName(), c.String())
+		}
+	}
+}

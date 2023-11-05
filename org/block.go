@@ -9,6 +9,7 @@ import (
 type Block struct {
 	Name       string
 	Pos        Pos
+	EndPos     Pos
 	Parameters []string
 	Children   []Node
 	Result     Node
@@ -32,10 +33,10 @@ var exampleBlockEscapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*),([ \t]*)(\*|,\
 
 func lexBlock(line string, row, col int) (token, bool) {
 	if m := beginBlockRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
+		pos := Pos{row, col + len(m[1])}
 		return token{"beginBlock", len(m[1]), strings.ToUpper(m[2]), m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := endBlockRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
+		pos := Pos{row, col + len(m[1])}
 		return token{"endBlock", len(m[1]), strings.ToUpper(m[2]), m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
@@ -43,7 +44,7 @@ func lexBlock(line string, row, col int) (token, bool) {
 
 func lexResult(line string, row, col int) (token, bool) {
 	if m := resultRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
+		pos := Pos{row, col + len(m[1])}
 		return token{"result", len(m[1]), "", m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
@@ -51,7 +52,7 @@ func lexResult(line string, row, col int) (token, bool) {
 
 func lexExample(line string, row, col int) (token, bool) {
 	if m := exampleLineRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
+		pos := Pos{row, col + len(m[1])}
 		return token{"example", len(m[1]), m[3], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
@@ -66,7 +67,7 @@ func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 	stop := func(d *Document, i int) bool {
 		return i >= len(d.tokens) || (d.tokens[i].kind == "endBlock" && d.tokens[i].content == name)
 	}
-	block, i := Block{name, d.tokens[start].Pos(), parameters, nil, nil}, i+1
+	block, i := Block{name, d.tokens[start].Pos(), d.tokens[start].EndPos(), parameters, nil, nil}, i+1
 	if isRawTextBlock(name) {
 		rawText := ""
 		for ; !stop(d, i); i++ {
@@ -84,6 +85,7 @@ func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 	if i >= len(d.tokens) || d.tokens[i].kind != "endBlock" || d.tokens[i].content != name {
 		return 0, nil
 	}
+	block.EndPos = d.tokens[i].EndPos()
 	if name == "SRC" {
 		consumed, result := d.parseSrcBlockResult(i+1, parentStop)
 		block.Result = result
@@ -167,10 +169,13 @@ func (self Example) GetEnd() Pos {
 }
 func (self Block) GetPos() Pos { return self.Pos }
 func (self Block) GetEnd() Pos {
-	if len(self.Children) > 0 {
-		return self.Children[len(self.Children)-1].GetEnd()
-	}
-	return self.GetPos()
+	/*
+		if len(self.Children) > 0 {
+			return self.Children[len(self.Children)-1].GetEnd()
+		}
+		return self.GetPos()
+	*/
+	return self.EndPos
 }
 func (self Result) GetPos() Pos { return self.Pos }
 func (self Result) GetEnd() Pos {

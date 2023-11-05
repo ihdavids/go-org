@@ -175,7 +175,7 @@ func (d *Document) parseInclude(k Keyword, ni int) (int, Node) {
 				d.Log.Printf("Bad include %#v: %s", k, err)
 				return k
 			}
-			return Block{strings.ToUpper(kind), k.Pos, []string{lang}, d.parseRawInline(string(bs), ni), nil}
+			return Block{strings.ToUpper(kind), k.Pos, k.GetEnd(), []string{lang}, d.parseRawInline(string(bs), ni), nil}
 		}
 	}
 	p := k.GetEnd()
