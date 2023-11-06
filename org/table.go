@@ -159,9 +159,12 @@ func isSpecialRow(rawColumns []string) bool {
 }
 
 func (self Row) GetEnd() Pos {
-	p := self.Columns[len(self.Columns)-1].GetEnd()
-	p.Col += 1 // include end marker that is skipped
-	return p
+	if self.Columns != nil && len(self.Columns) > 0 {
+		p := self.Columns[len(self.Columns)-1].GetEnd()
+		p.Col += 1 // include end marker that is skipped
+		return p
+	}
+	return Pos{0, 0}
 }
 func (self Row) GetPos() Pos {
 	return self.Columns[0].GetPos()
@@ -175,7 +178,10 @@ func (self Column) GetPos() Pos {
 func (n Table) String() string { return orgWriter.WriteNodesAsString(n) }
 func (self Table) GetPos() Pos { return self.Pos }
 func (self Table) GetEnd() Pos {
-	return self.Rows[len(self.Rows)-1].GetEnd()
+	if self.Rows != nil && len(self.Rows) > 0 {
+		return self.Rows[len(self.Rows)-1].GetEnd()
+	}
+	return self.Pos
 }
 
 // lazy suzan
