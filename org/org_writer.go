@@ -107,7 +107,7 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	if !isRawTextBlock(b.Name) {
 		w.WriteString(w.Indent)
 	}
-	w.WriteString(w.Indent + "#+END_" + b.Name + "\n")
+	w.WriteString("#+END_" + b.Name + "\n")
 
 	if b.Result != nil {
 		w.WriteString("\n")
