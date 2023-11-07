@@ -107,7 +107,7 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	if !isRawTextBlock(b.Name) {
 		w.WriteString(w.Indent)
 	}
-	w.WriteString("#+END_" + b.Name + "\n")
+	w.WriteString(w.Indent + "#+END_" + b.Name + "\n")
 
 	if b.Result != nil {
 		w.WriteString("\n")
@@ -116,7 +116,7 @@ func (w *OrgWriter) WriteBlock(b Block) {
 }
 
 func (w *OrgWriter) WriteResult(r Result) {
-	w.WriteString("#+RESULTS:\n")
+	w.WriteString(w.Indent + "#+RESULTS:\n")
 	WriteNodes(w, r.Node)
 }
 
@@ -144,15 +144,15 @@ func (w *OrgWriter) WriteDrawer(d Drawer) {
 }
 
 func (w *OrgWriter) WritePropertyDrawer(d PropertyDrawer) {
-	w.WriteString(":PROPERTIES:\n")
+	w.WriteString(w.Indent + ":PROPERTIES:\n")
 	for _, kvPair := range d.Properties {
 		k, v := kvPair[0], kvPair[1]
 		if v != "" {
 			v = " " + v
 		}
-		w.WriteString(fmt.Sprintf(":%s:%s\n", k, v))
+		w.WriteString(fmt.Sprintf(w.Indent+"  :%s:%s\n", k, v))
 	}
-	w.WriteString(":END:\n")
+	w.WriteString(w.Indent + ":END:\n")
 }
 
 func (w *OrgWriter) WriteFootnoteDefinition(f FootnoteDefinition) {
