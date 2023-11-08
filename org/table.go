@@ -83,13 +83,25 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	}
 
 	table := Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos()}
+	var starts []Pos
+	var ends []Pos
 	for r, rawColumns := range rawRows {
 		row := Row{nil, isSpecialRow(rawColumns)}
-		starts := rowStartPositions[r]
-		ends := rowEndPositions[r]
+		if rowStartPositions[r] != nil {
+			starts = rowStartPositions[r]
+			ends = rowEndPositions[r]
+		}
 		if len(rawColumns) != 0 {
 			for i := range table.ColumnInfos {
-				column := Column{starts[i], ends[i], nil, &table.ColumnInfos[i]}
+				var s Pos = Pos{0, 0}
+				var e Pos = Pos{0, 0}
+				if starts != nil {
+					s = starts[i]
+				}
+				if ends != nil {
+					e = ends[i]
+				}
+				column := Column{s, e, nil, &table.ColumnInfos[i]}
 				if i < len(rawColumns) {
 					column.Children = d.parseInline(rawColumns[i], start) // TODO: This is off by the row index
 				}
