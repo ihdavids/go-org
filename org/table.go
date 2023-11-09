@@ -185,7 +185,10 @@ func (self Row) GetEnd() Pos {
 	return Pos{0, 0}
 }
 func (self Row) GetPos() Pos {
-	return self.Columns[0].GetPos()
+	if len(self.Columns) > 0 {
+		return self.Columns[0].GetPos()
+	}
+	return Pos{0, 0}
 }
 func (self Column) GetEnd() Pos {
 	return self.EndPos
