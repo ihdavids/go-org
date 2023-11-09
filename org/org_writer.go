@@ -186,7 +186,8 @@ func (w *OrgWriter) WriteSDC(s SDC) {
 
 func (w *OrgWriter) WriteParagraph(p Paragraph) {
 	content := w.WriteNodesAsString(p.Children...)
-	if len(content) > 0 && content[0] != '\n' {
+	temp := strings.TrimPrefix(content, w.Indent)
+	if len(content) > 0 && content[0] != '\n' && len(temp) == len(content) {
 		w.WriteString(w.Indent)
 	}
 	w.WriteString(content + "\n")
