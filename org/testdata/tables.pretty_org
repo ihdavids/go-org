@@ -55,3 +55,8 @@
 |   |   |
 |   |   |
 2--------------------3
+
+#+CAPTION: This table has no spaces
+
+| A | B | C | D |
+| A | B | C | D |

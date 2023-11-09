@@ -32,7 +32,7 @@ type ColumnInfo struct {
 	DisplayLen int
 }
 
-var tableSeparatorRegexp = regexp.MustCompile(`^(\s*)(\|[+-|]*)\s*$`)
+var tableSeparatorRegexp = regexp.MustCompile(`^(\s*)(\|[+|-]+)\s*$`)
 var tableRowRegexp = regexp.MustCompile(`^(\s*)(\|.*)`)
 
 var columnAlignAndLengthRegexp = regexp.MustCompile(`^<(l|c|r)?(\d+)?>$`)
