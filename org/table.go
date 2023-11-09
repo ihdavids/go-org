@@ -96,9 +96,15 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 				var s Pos = Pos{0, 0}
 				var e Pos = Pos{0, 0}
 				if starts != nil {
-					s = starts[i]
+					if i < len(starts) {
+						s = starts[i]
+					} else if i == len(starts) {
+						s = ends[i-1]
+						s = Pos{Row: s.Row, Col: s.Col + 1}
+						e = s
+					}
 				}
-				if ends != nil {
+				if ends != nil && i < len(ends) {
 					e = ends[i]
 				}
 				column := Column{s, e, nil, &table.ColumnInfos[i]}
