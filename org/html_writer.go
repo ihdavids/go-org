@@ -29,6 +29,14 @@ type HTMLWriter struct {
 	footnotes  *footnotes
 }
 
+func (n *HTMLWriter) NodeIdx(_ int) {
+	// We do not need the node idx at this point in time
+}
+
+func (n *HTMLWriter) ResetLineBreak() {
+	// We do not need the reset line break at this point in time
+}
+
 type footnotes struct {
 	mapping map[string]int
 	list    []*FootnoteDefinition

@@ -128,7 +128,7 @@ var latexFragmentPairs = map[string]string{
 func (d *Document) parseInline(input string, i int) (nodes []Node) {
 	previous, current := 0, 0
 	newlineOffset := 0
-	inputStart := 0
+	//inputStart := 0
 	for current < len(input) {
 		rewind, consumed, node := 0, 0, (Node)(nil)
 		switch input[current] {
@@ -154,7 +154,7 @@ func (d *Document) parseInline(input string, i int) (nodes []Node) {
 			consumed, node = d.parseLatexFragment(input, current, 1, i)
 		case '\n':
 			newlineOffset += 1
-			inputStart = current
+			//inputStart = current
 			consumed, node = d.parseLineBreak(input, current, i)
 		case ':':
 			rewind, consumed, node = d.parseAutoLink(input, current, i)
@@ -166,7 +166,7 @@ func (d *Document) parseInline(input string, i int) (nodes []Node) {
 				inputPos := d.tokens[i].Pos()
 				if newlineOffset > 0 {
 					inputPos.Row += newlineOffset
-					inputPos.Col = inputStart - previous
+					inputPos.Col = previous
 				}
 				nodes = append(nodes, Text{inputPos, computeTextEnd(inputPos, inputContent), inputContent, false})
 			}

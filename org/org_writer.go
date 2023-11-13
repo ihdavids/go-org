@@ -14,7 +14,17 @@ type OrgWriter struct {
 	TagsColumn      int
 
 	strings.Builder
-	Indent string
+	Indent        string
+	Idx           int
+	LastLineBreak int
+}
+
+func (w *OrgWriter) NodeIdx(i int) {
+	w.Idx = i
+}
+
+func (w *OrgWriter) ResetLineBreak() {
+	w.LastLineBreak = -1
 }
 
 var exampleBlockUnescapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*)(\*|,\*|#\+|,#\+)`)
@@ -32,7 +42,9 @@ var emphasisOrgBorders = map[string][]string{
 
 func NewOrgWriter() *OrgWriter {
 	return &OrgWriter{
-		TagsColumn: 77,
+		TagsColumn:    77,
+		Idx:           0,
+		LastLineBreak: -1,
 	}
 }
 
@@ -50,6 +62,15 @@ func (w *OrgWriter) WriteNodesAsString(nodes ...Node) string {
 	builder := w.Builder
 	w.Builder = strings.Builder{}
 	WriteNodes(w, nodes...)
+	out := w.String()
+	w.Builder = builder
+	return out
+}
+
+func (w *OrgWriter) WriteNodesAsStringLB(offset int, nodes ...Node) string {
+	builder := w.Builder
+	w.Builder = strings.Builder{}
+	WriteNodesLB(offset, w, nodes...)
 	out := w.String()
 	w.Builder = builder
 	return out
@@ -86,11 +107,13 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 	if h.Properties != nil {
 		WriteNodes(w, *h.Properties)
 	}
-	WriteNodes(w, h.Children...)
+	w.LastLineBreak = 0
+	WriteNodesLB(1, w, h.Children...)
 	w.Indent = originalIndent
 }
 
 func (w *OrgWriter) WriteBlock(b Block) {
+	idx := w.Idx
 	w.WriteString(w.Indent + "#+BEGIN_" + b.Name)
 	if len(b.Parameters) != 0 {
 		w.WriteString(" " + strings.Join(b.Parameters, " "))
@@ -99,20 +122,27 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	if isRawTextBlock(b.Name) {
 		w.WriteString(w.Indent)
 	}
-	content := w.WriteNodesAsString(b.Children...)
+	indent := w.Indent
+	w.Indent += "  "
+	w.LastLineBreak = idx - 1
+	content := w.WriteNodesAsStringLB(idx, b.Children...)
+	w.Indent = indent
 	if b.Name == "EXAMPLE" || (b.Name == "SRC" && len(b.Parameters) >= 1 && b.Parameters[0] == "org") {
 		content = exampleBlockUnescapeRegexp.ReplaceAllString(content, "$1$2,$3")
 	}
 	w.WriteString(content)
-	if !isRawTextBlock(b.Name) {
-		w.WriteString(w.Indent)
-	}
+	//if !isRawTextBlock(b.Name) {
+	w.WriteString(w.Indent)
+	//}
 	w.WriteString("#+END_" + b.Name + "\n")
 
 	if b.Result != nil {
 		w.WriteString("\n")
-		WriteNodes(w, b.Result)
+		w.LastLineBreak = idx - 1
+		WriteNodesLB(idx, w, b.Result)
 	}
+	// We consider this a linebreak
+	w.LastLineBreak = idx
 }
 
 func (w *OrgWriter) WriteResult(r Result) {
@@ -139,8 +169,12 @@ func (w *OrgWriter) WriteInlineBlock(b InlineBlock) {
 
 func (w *OrgWriter) WriteDrawer(d Drawer) {
 	w.WriteString(w.Indent + ":" + d.Name + ":\n")
-	WriteNodes(w, d.Children...)
+	// Track line break
+	w.LastLineBreak = w.Idx - 1
+	WriteNodesLB(w.Idx, w, d.Children...)
 	w.WriteString(w.Indent + ":END:\n")
+	// Track line break
+	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) WritePropertyDrawer(d PropertyDrawer) {
@@ -153,6 +187,7 @@ func (w *OrgWriter) WritePropertyDrawer(d PropertyDrawer) {
 		w.WriteString(fmt.Sprintf(w.Indent+"  :%s:%s\n", k, v))
 	}
 	w.WriteString(w.Indent + ":END:\n")
+	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) WriteFootnoteDefinition(f FootnoteDefinition) {
@@ -185,12 +220,15 @@ func (w *OrgWriter) WriteSDC(s SDC) {
 }
 
 func (w *OrgWriter) WriteParagraph(p Paragraph) {
-	content := w.WriteNodesAsString(p.Children...)
-	temp := strings.TrimPrefix(content, w.Indent)
-	if len(content) > 0 && content[0] != '\n' && len(temp) == len(content) {
-		w.WriteString(w.Indent)
-	}
+	idx := w.Idx
+	content := w.WriteNodesAsStringLB(w.Idx, p.Children...)
+	//temp := strings.TrimPrefix(content, w.Indent)
+	//if len(content) > 0 && content[0] != '\n' && len(temp) == len(content) {
+	//	w.WriteString(w.Indent)
+	//}
 	w.WriteString(content + "\n")
+	// We consider this a linebreak
+	w.LastLineBreak = idx
 }
 
 func (w *OrgWriter) WriteExample(e Example) {
@@ -329,7 +367,17 @@ func (w *OrgWriter) WriteHorizontalRule(hr HorizontalRule) {
 	w.WriteString(w.Indent + "-----\n")
 }
 
-func (w *OrgWriter) WriteText(t Text) { w.WriteString(t.Content) }
+func (w *OrgWriter) WriteText(t Text) {
+	// If we just wrote a newline
+	if w.LastLineBreak >= 0 && w.Idx == (w.LastLineBreak+1) {
+		//fmt.Printf("IDX: [%d] LastLineBreak: [%d]\n", w.Idx, w.LastLineBreak)
+		temp := strings.TrimPrefix(t.Content, w.Indent)
+		if len(t.Content) > 0 && t.Content[0] != '\n' && len(temp) == len(t.Content) {
+			w.WriteString(w.Indent)
+		}
+	}
+	w.WriteString(t.Content)
+}
 
 func (w *OrgWriter) WriteEmphasis(e Emphasis) {
 	borders, ok := emphasisOrgBorders[e.Kind]
@@ -352,11 +400,12 @@ func (w *OrgWriter) WriteStatisticToken(s StatisticToken) {
 }
 
 func (w *OrgWriter) WriteLineBreak(l LineBreak) {
-	w.WriteString(strings.Repeat("\n"+w.Indent, l.Count))
+	w.LastLineBreak = w.Idx
+	w.WriteString(strings.Repeat("\n", l.Count))
 }
 
 func (w *OrgWriter) WriteExplicitLineBreak(l ExplicitLineBreak) {
-	w.WriteString(`\\` + "\n" + w.Indent)
+	w.WriteString(`\\` + "\n")
 }
 
 func (w *OrgWriter) WriteTimestamp(t Timestamp) {

@@ -24,6 +24,9 @@ func (w *ExtendedOrgWriter) WriteText(t Text) {
 
 func TestOrgWriter(t *testing.T) {
 	for _, path := range orgTestFiles() {
+		//if !strings.Contains(path, "headlines.org") {
+		//	continue
+		//}
 		if strings.Contains(path, "_result_out.") {
 			continue
 		}

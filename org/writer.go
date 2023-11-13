@@ -41,11 +41,21 @@ type Writer interface {
 	WriteFootnoteLink(FootnoteLink)
 	WriteFootnoteDefinition(FootnoteDefinition)
 	WriteSDC(SDC)
+	NodeIdx(int)
+	ResetLineBreak()
 }
 
 func WriteNodes(w Writer, nodes ...Node) {
+	WriteNodesLB(0, w, nodes...)
+}
+
+func WriteNodesLB(offset int, w Writer, nodes ...Node) {
 	w = w.WriterWithExtensions()
-	for _, n := range nodes {
+	if offset <= 0 {
+		w.ResetLineBreak()
+	}
+	for i, n := range nodes {
+		w.NodeIdx(i + offset)
 		switch n := n.(type) {
 		case Keyword:
 			w.WriteKeyword(n)
