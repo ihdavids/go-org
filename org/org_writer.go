@@ -27,6 +27,14 @@ func (w *OrgWriter) ResetLineBreak() {
 	w.LastLineBreak = -1
 }
 
+func (w *OrgWriter) SetLineBreak() {
+	w.LastLineBreak = w.Idx
+}
+
+func (w *OrgWriter) IsAfterNewline() bool {
+	return w.LastLineBreak >= 0 && w.Idx == (w.LastLineBreak+1)
+}
+
 var exampleBlockUnescapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*)(\*|,\*|#\+|,#\+)`)
 
 var emphasisOrgBorders = map[string][]string{
@@ -151,7 +159,7 @@ func (w *OrgWriter) WriteResult(r Result) {
 	w.WriteString(w.Indent + "#+RESULTS:\n")
 	w.LastLineBreak = w.Idx - 1
 	WriteNodesLB(w.Idx, w, r.Node)
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteInlineBlock(b InlineBlock) {
@@ -178,7 +186,7 @@ func (w *OrgWriter) WriteDrawer(d Drawer) {
 	WriteNodesLB(w.Idx, w, d.Children...)
 	w.WriteString(w.Indent + ":END:\n")
 	// Track line break
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WritePropertyDrawer(d PropertyDrawer) {
@@ -191,7 +199,7 @@ func (w *OrgWriter) WritePropertyDrawer(d PropertyDrawer) {
 		w.WriteString(fmt.Sprintf(w.Indent+"  :%s:%s\n", k, v))
 	}
 	w.WriteString(w.Indent + ":END:\n")
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteFootnoteDefinition(f FootnoteDefinition) {
@@ -221,7 +229,7 @@ func (w *OrgWriter) WriteSDC(s SDC) {
 		break
 	}
 	w.WriteString(fmt.Sprintf("%s: %s\n", name, s.Date.ToString()))
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteParagraph(p Paragraph) {
@@ -252,7 +260,7 @@ func (w *OrgWriter) WriteKeyword(k Keyword) {
 		w.WriteString(" " + k.Value)
 	}
 	w.WriteString("\n")
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteInclude(i Include) {
@@ -269,19 +277,21 @@ func (w *OrgWriter) WriteNodeWithMeta(n NodeWithMeta) {
 		w.WriteString(w.Indent + "#+ATTR_HTML: ")
 		w.WriteString(strings.Join(attributes, " ") + "\n")
 	}
-	w.LastLineBreak = w.Idx
-	WriteNodes(w, n.Node)
+	idx := w.Idx
+	w.LastLineBreak = w.Idx - 1
+	WriteNodesLB(idx, w, n.Node)
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteNodeWithName(n NodeWithName) {
 	w.WriteString(fmt.Sprintf("#+NAME: %s\n", n.Name))
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 	WriteNodes(w, n.Node)
 }
 
 func (w *OrgWriter) WriteComment(c Comment) {
 	w.WriteString(w.Indent + "# " + c.Content + "\n")
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteList(l List) { WriteNodes(w, l.Items...) }
@@ -370,12 +380,12 @@ func (w *OrgWriter) WriteTable(t Table) {
 		}
 		w.WriteString("\n")
 	}
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteHorizontalRule(hr HorizontalRule) {
 	w.WriteString(w.Indent + "-----\n")
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteText(t Text) {
@@ -395,6 +405,9 @@ func (w *OrgWriter) WriteEmphasis(e Emphasis) {
 	if !ok {
 		panic(fmt.Sprintf("bad emphasis %#v", e))
 	}
+	if w.IsAfterNewline() {
+		w.WriteString(w.Indent)
+	}
 	w.WriteString(borders[0])
 	WriteNodes(w, e.Content...)
 	w.WriteString(borders[1])
@@ -411,12 +424,12 @@ func (w *OrgWriter) WriteStatisticToken(s StatisticToken) {
 }
 
 func (w *OrgWriter) WriteLineBreak(l LineBreak) {
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 	w.WriteString(strings.Repeat("\n", l.Count))
 }
 
 func (w *OrgWriter) WriteExplicitLineBreak(l ExplicitLineBreak) {
-	w.LastLineBreak = w.Idx
+	w.SetLineBreak()
 	w.WriteString(`\\` + "\n")
 }
 
@@ -434,6 +447,9 @@ func (w *OrgWriter) WriteFootnoteLink(l FootnoteLink) {
 }
 
 func (w *OrgWriter) WriteRegularLink(l RegularLink) {
+	if w.IsAfterNewline() {
+		w.WriteString(w.Indent)
+	}
 	if l.AutoLink {
 		w.WriteString(l.URL)
 	} else if l.Description == nil {
