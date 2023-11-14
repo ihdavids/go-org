@@ -123,9 +123,11 @@ func (w *OrgWriter) WriteBlock(b Block) {
 		w.WriteString(w.Indent)
 	}
 	indent := w.Indent
-	w.Indent += "  "
-	w.LastLineBreak = idx - 1
-	content := w.WriteNodesAsStringLB(idx, b.Children...)
+	//w.Indent += "  "
+	//w.LastLineBreak = idx - 1
+	//content := w.WriteNodesAsStringLB(idx, b.Children...)
+	//w.LastLineBreak = idx - 1
+	content := w.WriteNodesAsString(b.Children...)
 	w.Indent = indent
 	if b.Name == "EXAMPLE" || (b.Name == "SRC" && len(b.Parameters) >= 1 && b.Parameters[0] == "org") {
 		content = exampleBlockUnescapeRegexp.ReplaceAllString(content, "$1$2,$3")
@@ -147,7 +149,9 @@ func (w *OrgWriter) WriteBlock(b Block) {
 
 func (w *OrgWriter) WriteResult(r Result) {
 	w.WriteString(w.Indent + "#+RESULTS:\n")
-	WriteNodes(w, r.Node)
+	w.LastLineBreak = w.Idx - 1
+	WriteNodesLB(w.Idx, w, r.Node)
+	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) WriteInlineBlock(b InlineBlock) {
@@ -217,6 +221,7 @@ func (w *OrgWriter) WriteSDC(s SDC) {
 		break
 	}
 	w.WriteString(fmt.Sprintf("%s: %s\n", name, s.Date.ToString()))
+	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) WriteParagraph(p Paragraph) {
@@ -247,6 +252,7 @@ func (w *OrgWriter) WriteKeyword(k Keyword) {
 		w.WriteString(" " + k.Value)
 	}
 	w.WriteString("\n")
+	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) WriteInclude(i Include) {
@@ -255,24 +261,27 @@ func (w *OrgWriter) WriteInclude(i Include) {
 
 func (w *OrgWriter) WriteNodeWithMeta(n NodeWithMeta) {
 	for _, ns := range n.Meta.Caption {
-		w.WriteString("#+CAPTION: ")
+		w.WriteString(w.Indent + "#+CAPTION: ")
 		WriteNodes(w, ns...)
 		w.WriteString("\n")
 	}
 	for _, attributes := range n.Meta.HTMLAttributes {
-		w.WriteString("#+ATTR_HTML: ")
+		w.WriteString(w.Indent + "#+ATTR_HTML: ")
 		w.WriteString(strings.Join(attributes, " ") + "\n")
 	}
+	w.LastLineBreak = w.Idx
 	WriteNodes(w, n.Node)
 }
 
 func (w *OrgWriter) WriteNodeWithName(n NodeWithName) {
 	w.WriteString(fmt.Sprintf("#+NAME: %s\n", n.Name))
+	w.LastLineBreak = w.Idx
 	WriteNodes(w, n.Node)
 }
 
 func (w *OrgWriter) WriteComment(c Comment) {
 	w.WriteString(w.Indent + "# " + c.Content + "\n")
+	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) WriteList(l List) { WriteNodes(w, l.Items...) }
@@ -361,10 +370,12 @@ func (w *OrgWriter) WriteTable(t Table) {
 		}
 		w.WriteString("\n")
 	}
+	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) WriteHorizontalRule(hr HorizontalRule) {
 	w.WriteString(w.Indent + "-----\n")
+	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) WriteText(t Text) {
@@ -405,6 +416,7 @@ func (w *OrgWriter) WriteLineBreak(l LineBreak) {
 }
 
 func (w *OrgWriter) WriteExplicitLineBreak(l ExplicitLineBreak) {
+	w.LastLineBreak = w.Idx
 	w.WriteString(`\\` + "\n")
 }
 

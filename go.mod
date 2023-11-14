@@ -13,4 +13,5 @@ require (
 require (
 	github.com/alecthomas/chroma/v2 v2.5.0 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
+	github.com/ekalinin/go-textwrap v0.0.2 // indirect
 )
