@@ -20,4 +20,4 @@
   |------+------------------------------------------------------------------------------------|
   | ealb | Omit newlines between multi-byte characters (east asian line breaks, non-standard) |
 
-  [fn:1]  This footnote definition won't be printed
+  [fn:1] This footnote definition won't be printed
