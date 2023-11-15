@@ -451,6 +451,10 @@ func (w *OrgWriter) WriteEmphasis(e Emphasis) {
 func (w *OrgWriter) WriteLatexFragment(l LatexFragment) {
 	w.WriteString(l.OpeningPair)
 	WriteNodes(w, l.Content...)
+	w.Idx += 1
+	if w.IsAfterNewline() {
+		w.WriteIndent()
+	}
 	w.WriteString(l.ClosingPair)
 }
 
