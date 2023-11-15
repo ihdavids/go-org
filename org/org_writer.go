@@ -38,6 +38,10 @@ func (w *OrgWriter) SetLineBreak() {
 	w.LastLineBreak = w.Idx
 }
 
+func (w *OrgWriter) SetLineBreakAs(idx int) {
+	w.LastLineBreak = idx
+}
+
 func (w *OrgWriter) IsAfterNewline() bool {
 	return w.LastLineBreak >= 0 && w.Idx == (w.LastLineBreak+1)
 }
@@ -172,7 +176,7 @@ func (w *OrgWriter) WriteBlock(b Block) {
 		WriteNodesLB(idx, w, b.Result)
 	}
 	// We consider this a linebreak
-	w.LastLineBreak = idx
+	w.SetLineBreakAs(idx)
 }
 
 func (w *OrgWriter) WriteResult(r Result) {
@@ -268,7 +272,7 @@ func (w *OrgWriter) WriteParagraph(p Paragraph) {
 	//}
 	w.WriteString(content + "\n")
 	// We consider this a linebreak
-	w.LastLineBreak = idx
+	w.SetLineBreakAs(idx)
 }
 
 func (w *OrgWriter) WriteExample(e Example) {
@@ -311,7 +315,7 @@ func (w *OrgWriter) WriteNodeWithMeta(n NodeWithMeta) {
 	idx := w.Idx
 	w.LastLineBreak = w.Idx - 1
 	WriteNodesLB(idx, w, n.Node)
-	w.SetLineBreak()
+	w.SetLineBreakAs(idx)
 }
 
 func (w *OrgWriter) WriteNodeWithName(n NodeWithName) {
@@ -326,7 +330,11 @@ func (w *OrgWriter) WriteComment(c Comment) {
 	w.SetLineBreak()
 }
 
-func (w *OrgWriter) WriteList(l List) { WriteNodes(w, l.Items...) }
+func (w *OrgWriter) WriteList(l List) {
+	idx := w.Idx
+	WriteNodes(w, l.Items...)
+	w.SetLineBreakAs(idx)
+}
 
 func (w *OrgWriter) WriteListItem(li ListItem) {
 	originalBuilder, originalIndent := w.Builder, w.Indent
