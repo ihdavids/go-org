@@ -6,6 +6,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/ekalinin/go-textwrap"
 )
 
 // OrgWriter export an org document into pretty printed org document.
@@ -17,6 +19,7 @@ type OrgWriter struct {
 	Indent        string
 	Idx           int
 	LastLineBreak int
+	DoIndent      bool
 }
 
 func (w *OrgWriter) NodeIdx(i int) {
@@ -27,12 +30,22 @@ func (w *OrgWriter) ResetLineBreak() {
 	w.LastLineBreak = -1
 }
 
+func (w *OrgWriter) SetIndentState(state bool) {
+	w.DoIndent = state
+}
+
 func (w *OrgWriter) SetLineBreak() {
 	w.LastLineBreak = w.Idx
 }
 
 func (w *OrgWriter) IsAfterNewline() bool {
 	return w.LastLineBreak >= 0 && w.Idx == (w.LastLineBreak+1)
+}
+
+func (w *OrgWriter) WriteIndent() {
+	if w.DoIndent {
+		w.WriteString(w.Indent)
+	}
 }
 
 var exampleBlockUnescapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*)(\*|,\*|#\+|,#\+)`)
@@ -53,6 +66,7 @@ func NewOrgWriter() *OrgWriter {
 		TagsColumn:    77,
 		Idx:           0,
 		LastLineBreak: -1,
+		DoIndent:      true,
 	}
 }
 
@@ -122,27 +136,33 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 
 func (w *OrgWriter) WriteBlock(b Block) {
 	idx := w.Idx
-	w.WriteString(w.Indent + "#+BEGIN_" + b.Name)
+	w.WriteIndent()
+	w.WriteString("#+BEGIN_" + b.Name)
 	if len(b.Parameters) != 0 {
 		w.WriteString(" " + strings.Join(b.Parameters, " "))
 	}
 	w.WriteString("\n")
-	if isRawTextBlock(b.Name) {
-		w.WriteString(w.Indent)
-	}
-	indent := w.Indent
+	//if isRawTextBlock(b.Name) {
+	//	w.WriteIndent()
+	//}
+	//indent := w.Indent
 	//w.Indent += "  "
 	//w.LastLineBreak = idx - 1
 	//content := w.WriteNodesAsStringLB(idx, b.Children...)
 	//w.LastLineBreak = idx - 1
+	// Disable the indent so we can dedent and then indent
+	w.SetIndentState(false)
 	content := w.WriteNodesAsString(b.Children...)
-	w.Indent = indent
+	w.SetIndentState(true)
+	content = textwrap.Dedent(content)
+	content = textwrap.Indent(content, w.Indent+"  ", nil)
+	//w.Indent = indent
 	if b.Name == "EXAMPLE" || (b.Name == "SRC" && len(b.Parameters) >= 1 && b.Parameters[0] == "org") {
 		content = exampleBlockUnescapeRegexp.ReplaceAllString(content, "$1$2,$3")
 	}
 	w.WriteString(content)
 	//if !isRawTextBlock(b.Name) {
-	w.WriteString(w.Indent)
+	w.WriteIndent()
 	//}
 	w.WriteString("#+END_" + b.Name + "\n")
 
@@ -156,7 +176,8 @@ func (w *OrgWriter) WriteBlock(b Block) {
 }
 
 func (w *OrgWriter) WriteResult(r Result) {
-	w.WriteString(w.Indent + "#+RESULTS:\n")
+	w.WriteIndent()
+	w.WriteString("#+RESULTS:\n")
 	w.LastLineBreak = w.Idx - 1
 	WriteNodesLB(w.Idx, w, r.Node)
 	w.SetLineBreak()
@@ -180,25 +201,30 @@ func (w *OrgWriter) WriteInlineBlock(b InlineBlock) {
 }
 
 func (w *OrgWriter) WriteDrawer(d Drawer) {
-	w.WriteString(w.Indent + ":" + d.Name + ":\n")
+	w.WriteIndent()
+	w.WriteString(":" + d.Name + ":\n")
 	// Track line break
 	w.LastLineBreak = w.Idx - 1
 	WriteNodesLB(w.Idx, w, d.Children...)
-	w.WriteString(w.Indent + ":END:\n")
+	w.WriteIndent()
+	w.WriteString(":END:\n")
 	// Track line break
 	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WritePropertyDrawer(d PropertyDrawer) {
-	w.WriteString(w.Indent + ":PROPERTIES:\n")
+	w.WriteIndent()
+	w.WriteString(":PROPERTIES:\n")
 	for _, kvPair := range d.Properties {
 		k, v := kvPair[0], kvPair[1]
 		if v != "" {
 			v = " " + v
 		}
-		w.WriteString(fmt.Sprintf(w.Indent+"  :%s:%s\n", k, v))
+		w.WriteIndent()
+		w.WriteString(fmt.Sprintf("  :%s:%s\n", k, v))
 	}
-	w.WriteString(w.Indent + ":END:\n")
+	w.WriteIndent()
+	w.WriteString(":END:\n")
 	w.SetLineBreak()
 }
 
@@ -206,7 +232,8 @@ func (w *OrgWriter) WriteFootnoteDefinition(f FootnoteDefinition) {
 	if f.Inline {
 		w.WriteString(fmt.Sprintf("[fn:%s]", f.Name))
 	} else {
-		w.WriteString(fmt.Sprintf(w.Indent+"[fn:%s]", f.Name))
+		w.WriteIndent()
+		w.WriteString(fmt.Sprintf("[fn:%s]", f.Name))
 	}
 	content := w.WriteNodesAsString(f.Children...)
 	if content != "" && !unicode.IsSpace(rune(content[0])) {
@@ -246,7 +273,8 @@ func (w *OrgWriter) WriteParagraph(p Paragraph) {
 
 func (w *OrgWriter) WriteExample(e Example) {
 	for _, n := range e.Children {
-		w.WriteString(w.Indent + ":")
+		w.WriteIndent()
+		w.WriteString(":")
 		if content := w.WriteNodesAsString(n); content != "" {
 			w.WriteString(" " + content)
 		}
@@ -255,7 +283,8 @@ func (w *OrgWriter) WriteExample(e Example) {
 }
 
 func (w *OrgWriter) WriteKeyword(k Keyword) {
-	w.WriteString(w.Indent + "#+" + k.Key + ":")
+	w.WriteIndent()
+	w.WriteString("#+" + k.Key + ":")
 	if k.Value != "" {
 		w.WriteString(" " + k.Value)
 	}
@@ -269,12 +298,14 @@ func (w *OrgWriter) WriteInclude(i Include) {
 
 func (w *OrgWriter) WriteNodeWithMeta(n NodeWithMeta) {
 	for _, ns := range n.Meta.Caption {
-		w.WriteString(w.Indent + "#+CAPTION: ")
+		w.WriteIndent()
+		w.WriteString("#+CAPTION: ")
 		WriteNodes(w, ns...)
 		w.WriteString("\n")
 	}
 	for _, attributes := range n.Meta.HTMLAttributes {
-		w.WriteString(w.Indent + "#+ATTR_HTML: ")
+		w.WriteIndent()
+		w.WriteString("#+ATTR_HTML: ")
 		w.WriteString(strings.Join(attributes, " ") + "\n")
 	}
 	idx := w.Idx
@@ -290,7 +321,8 @@ func (w *OrgWriter) WriteNodeWithName(n NodeWithName) {
 }
 
 func (w *OrgWriter) WriteComment(c Comment) {
-	w.WriteString(w.Indent + "# " + c.Content + "\n")
+	w.WriteIndent()
+	w.WriteString("# " + c.Content + "\n")
 	w.SetLineBreak()
 }
 
@@ -302,7 +334,8 @@ func (w *OrgWriter) WriteListItem(li ListItem) {
 	WriteNodes(w, li.Children...)
 	content := strings.TrimPrefix(w.String(), w.Indent)
 	w.Builder, w.Indent = originalBuilder, originalIndent
-	w.WriteString(w.Indent + li.Bullet)
+	w.WriteIndent()
+	w.WriteString(li.Bullet)
 	if li.Value != "" {
 		w.WriteString(fmt.Sprintf(" [@%s]", li.Value))
 	}
@@ -318,7 +351,8 @@ func (w *OrgWriter) WriteListItem(li ListItem) {
 
 func (w *OrgWriter) WriteDescriptiveListItem(di DescriptiveListItem) {
 	indent := w.Indent + strings.Repeat(" ", len(di.Bullet)+1)
-	w.WriteString(w.Indent + di.Bullet)
+	w.WriteIndent()
+	w.WriteString(di.Bullet)
 	if di.Status != "" {
 		w.WriteString(fmt.Sprintf(" [%s]", di.Status))
 		indent = indent + strings.Repeat(" ", len(di.Status)+3)
@@ -342,7 +376,7 @@ func (w *OrgWriter) WriteDescriptiveListItem(di DescriptiveListItem) {
 
 func (w *OrgWriter) WriteTable(t Table) {
 	for _, row := range t.Rows {
-		w.WriteString(w.Indent)
+		w.WriteIndent()
 		if len(row.Columns) == 0 {
 			w.WriteString(`|`)
 			for i := 0; i < len(t.ColumnInfos); i++ {
@@ -384,17 +418,18 @@ func (w *OrgWriter) WriteTable(t Table) {
 }
 
 func (w *OrgWriter) WriteHorizontalRule(hr HorizontalRule) {
-	w.WriteString(w.Indent + "-----\n")
+	w.WriteIndent()
+	w.WriteString("-----\n")
 	w.SetLineBreak()
 }
 
 func (w *OrgWriter) WriteText(t Text) {
 	// If we just wrote a newline
-	if w.LastLineBreak >= 0 && w.Idx == (w.LastLineBreak+1) {
+	if w.IsAfterNewline() {
 		//fmt.Printf("IDX: [%d] LastLineBreak: [%d]\n", w.Idx, w.LastLineBreak)
 		temp := strings.TrimPrefix(t.Content, w.Indent)
 		if len(t.Content) > 0 && t.Content[0] != '\n' && len(temp) == len(t.Content) {
-			w.WriteString(w.Indent)
+			w.WriteIndent()
 		}
 	}
 	w.WriteString(t.Content)
@@ -406,7 +441,7 @@ func (w *OrgWriter) WriteEmphasis(e Emphasis) {
 		panic(fmt.Sprintf("bad emphasis %#v", e))
 	}
 	if w.IsAfterNewline() {
-		w.WriteString(w.Indent)
+		w.WriteIndent()
 	}
 	w.WriteString(borders[0])
 	WriteNodes(w, e.Content...)
@@ -448,7 +483,7 @@ func (w *OrgWriter) WriteFootnoteLink(l FootnoteLink) {
 
 func (w *OrgWriter) WriteRegularLink(l RegularLink) {
 	if w.IsAfterNewline() {
-		w.WriteString(w.Indent)
+		w.WriteIndent()
 	}
 	if l.AutoLink {
 		w.WriteString(l.URL)
