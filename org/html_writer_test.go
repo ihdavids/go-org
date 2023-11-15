@@ -24,6 +24,8 @@ func TestHTMLWriter(t *testing.T) {
 		expected := fileString(path[:len(path)-len(".org")] + ".html")
 		reader, writer := strings.NewReader(fileString(path)), NewHTMLWriter()
 		actual, err := New().Silent().Parse(reader, path).Write(writer)
+		//output := path[:len(path)-len(".org")] + "_result_out.html"
+		//os.WriteFile(output, []byte(actual), os.ModePerm)
 		if err != nil {
 			t.Errorf("%s\n got error: %s", path, err)
 			continue
