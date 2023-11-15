@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/alecthomas/chroma v0.10.0
+	github.com/ekalinin/go-textwrap v0.0.2
 	github.com/niklasfasching/go-org v1.7.0
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/teambition/rrule-go v1.8.0
@@ -13,5 +14,4 @@ require (
 require (
 	github.com/alecthomas/chroma/v2 v2.5.0 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
-	github.com/ekalinin/go-textwrap v0.0.2 // indirect
 )
