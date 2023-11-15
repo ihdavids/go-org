@@ -58,9 +58,12 @@ func lexExample(line string, row, col int) (token, bool) {
 	return nilToken, false
 }
 
-func isRawTextBlock(name string) bool {
-	return name == "SRC" || name == "EXAMPLE" || name == "EXPORT" || name == "VERSE" || name == "QUOTE" || name == "CUSTOM"
-}
+/*
+	func isRawTextBlock(name string) bool {
+		return name == "SRC" || name == "EXAMPLE" || name == "EXPORT" || name == "VERSE" || name == "QUOTE" || name == "CUSTOM"
+	}
+*/
+func isRawTextBlock(name string) bool { return name == "SRC" || name == "EXAMPLE" || name == "EXPORT" }
 
 func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 	t, start := d.tokens[i], i
