@@ -2,7 +2,7 @@ Anything can be captioned.
 
 #+CAPTION: captioned soure block
 #+BEGIN_SRC sh
-echo "i have a caption!"
+  echo "i have a caption!"
 #+END_SRC
 
 #+CAPTION: captioned link (image in this case)

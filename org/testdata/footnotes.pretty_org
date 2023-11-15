@@ -7,31 +7,31 @@
     Rather, they are gathered and exported at the end of the document in the footnote section. [fn:4]
   - footnotes that reference a non-existant definition are rendered but log a warning [fn:does-not-exist]
 
-  [fn:4]  so this definition will not be at the end of this section in the exported document.
+  [fn:4] so this definition will not be at the end of this section in the exported document.
   Rather, it will be somewhere down below in the footnotes section.
 
-  [fn:5]  this definition will also not be exported here - not only that, it will be overwritten by a definition
+  [fn:5] this definition will also not be exported here - not only that, it will be overwritten by a definition
   of the same name later on in the document. That will log a warning but carry on nonetheless.
 * Footnotes
   Please note that the footnotes section is not automatically excluded from the export like in emacs. [fn:7]
 
-  [fn:foo-bar]  yolo
+  [fn:foo-bar] yolo
 
-  [fn:1]  https://www.example.com
+  [fn:1] https://www.example.com
   - footnotes can contain *markup*
   - and other elements
     - like blocks
       #+BEGIN_SRC
-      other non-plain
+        other non-plain
       #+END_SRC
     - and tables
       | 1 | a |
       | 2 | b |
       | 3 | c |
 
-  [fn:3]  [[http://example.com/unused-footnote][example.com/unused-footnote]]
+  [fn:3] [[http://example.com/unused-footnote][example.com/unused-footnote]]
 
-  [fn:5]  another unused footnote (this definition overwrites the previous definition of =fn:5=)
+  [fn:5] another unused footnote (this definition overwrites the previous definition of =fn:5=)
 
   [fn:6]
 
