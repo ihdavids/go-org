@@ -16,7 +16,7 @@
   and some lines of text
   1. and another subitem
      #+BEGIN_SRC sh
-     echo with a block
+       echo with a block
      #+END_SRC
   2. and another one with a table
      | a | b | c |
@@ -41,7 +41,7 @@ descriptive lists
           details on a new line (with an empty line in between)
           *continued*
           #+BEGIN_SRC bash
-          echo "Hello World!"
+            echo "Hello World!"
           #+END_SRC
 
 some list termination tests

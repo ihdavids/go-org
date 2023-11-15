@@ -1,6 +1,6 @@
 * Title [fn:1]
 
-  [fn:1]  this test file just exists to reproduce a bug with footnotes in headlines - that only happens in very specific circumstances.
+  [fn:1] this test file just exists to reproduce a bug with footnotes in headlines - that only happens in very specific circumstances.
   The TLDR is:
   - HTMLWriter.footnotes should be a pointer field. I didn't notice my error as go translated my pointer-method calls on
     non-pointer values rather than complaining - i.e. =footnotes.add()= transparently gets translated to =(&footnotes).add()= ([[https://golang.org/ref/spec#Calls][docs]]).
