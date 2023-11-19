@@ -271,6 +271,14 @@ func NewOrgDateFromTuple(start, end []string, ttype TimestampType) *OrgDate {
 	return d
 }
 
+func NewOrgDateNow() *OrgDate {
+	d := new(OrgDate)
+	d.Start = time.Now()
+	d.End = time.Now()
+	d.TimestampType = Inactive
+	return d
+}
+
 func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 	match := MatchIRegEx(&self.Re, line)
 	if match != nil {
