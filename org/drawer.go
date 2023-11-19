@@ -116,6 +116,48 @@ func (d *PropertyDrawer) Get(key string) (string, bool) {
 	return "", false
 }
 
+func (d *PropertyDrawer) Set(key string, val string) {
+	if d == nil {
+		return
+	}
+	didAdd := false
+	for i, kvPair := range d.Properties {
+		if kvPair[0] == key {
+			d.Properties[i][1] = val
+		}
+	}
+	if !didAdd {
+		d.Properties = append(d.Properties, []string{key, val})
+	}
+}
+
+func (d *PropertyDrawer) Has(key string) bool {
+	if d == nil {
+		return false
+	}
+	for _, kvPair := range d.Properties {
+		if kvPair[0] == key {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *PropertyDrawer) Append(key string, val string) {
+	if d == nil {
+		return
+	}
+	didAdd := false
+	for i, kvPair := range d.Properties {
+		if kvPair[0] == key {
+			d.Properties[i][1] += val
+		}
+	}
+	if !didAdd {
+		d.Properties = append(d.Properties, []string{key, val})
+	}
+}
+
 func (n Drawer) String() string         { return orgWriter.WriteNodesAsString(n) }
 func (n PropertyDrawer) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n PropertyDrawer) GetPos() Pos    { return n.Pos }
