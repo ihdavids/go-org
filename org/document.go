@@ -282,6 +282,13 @@ func (c *Configuration) Parse(input io.Reader, path string) (d *Document) {
 	d.tokenize(input)
 	_, nodes := d.parseMany(0, func(d *Document, i int) bool { return i >= len(d.tokens) })
 	d.Nodes = nodes
+	l := len(d.tokens)
+	h := &Headline{}
+	d.Outline.Section.Headline = h
+	if l > 0 {
+		h.Pos = d.tokens[l-1].pos
+		h.EndPos = d.tokens[l-1].endPos
+	}
 	return d
 }
 
