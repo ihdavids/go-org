@@ -274,7 +274,6 @@ func NewOrgDateFromTuple(start, end []string, ttype TimestampType) *OrgDate {
 func NewOrgDateNow() *OrgDate {
 	d := new(OrgDate)
 	d.Start = time.Now()
-	d.End = time.Now()
 	d.TimestampType = Inactive
 	return d
 }
