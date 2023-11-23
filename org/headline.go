@@ -73,6 +73,8 @@ type Headline struct {
 	Tags        []string
 	Children    []Node
 	CheckStatus *CheckStatus
+	Drawers     []*Drawer
+	Tables      []*Table
 	// Schedules  []Schedule
 }
 
@@ -174,6 +176,10 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 		if d, ok := nodes[0].(PropertyDrawer); ok {
 			headline.Properties = &d
 			nodes = nodes[1:]
+		} else if d, ok := nodes[0].(Drawer); ok {
+			headline.Drawers = append(headline.Drawers, &d)
+		} else if d, ok := nodes[0].(Table); ok {
+			headline.Tables = append(headline.Tables, &d)
 		}
 	}
 	headline.Children = nodes
