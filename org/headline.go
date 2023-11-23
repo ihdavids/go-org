@@ -262,6 +262,15 @@ func (h Headline) HasTimestamp() bool {
 	return h.Timestamp != nil
 }
 
+func (h Headline) FindDrawer(name string) *Drawer {
+	for _, d := range h.Drawers {
+		if d.Name == name {
+			return d
+		}
+	}
+	return nil
+}
+
 func (h Headline) IsExcluded(d *Document) bool {
 	for _, excludedTag := range strings.Fields(d.Get("EXCLUDE_TAGS")) {
 		for _, tag := range h.Tags {
