@@ -306,6 +306,15 @@ func (parent *Section) add(current *Section) {
 	}
 }
 
+func (h *Headline) AddDrawer(drawer *Drawer) {
+	h.Drawers = append(h.Drawers, drawer)
+	if h.Children == nil {
+		h.Children = append(h.Children, drawer)
+	} else {
+		h.Children = Prepend(h.Children, Node(drawer))
+	}
+}
+
 func (n Headline) String() string   { return orgWriter.WriteNodesAsString(n) }
 func (n Headline) GetPos() Pos      { return n.Pos }
 func (n Headline) GetTokenEnd() Pos { return n.EndPos }

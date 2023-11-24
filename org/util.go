@@ -19,3 +19,7 @@ func isImageOrVideoLink(n Node) bool {
 	}
 	return false
 }
+
+func Prepend[T any](slice []T, elems ...T) []T {
+	return append(elems, slice...)
+}

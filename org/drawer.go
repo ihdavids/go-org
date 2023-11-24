@@ -158,6 +158,10 @@ func (d *PropertyDrawer) Append(key string, val string) {
 	}
 }
 
+func (n *Drawer) Append(node Node) {
+	n.Children = append(n.Children, node)
+}
+
 func (n Drawer) String() string         { return orgWriter.WriteNodesAsString(n) }
 func (n PropertyDrawer) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n PropertyDrawer) GetPos() Pos    { return n.Pos }
