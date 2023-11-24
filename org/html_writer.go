@@ -395,6 +395,25 @@ func (w *HTMLWriter) WriteSDC(s SDC) {
 	w.WriteString(fmt.Sprintf(`%s</span>`, be))
 }
 
+func (w *HTMLWriter) WriteClock(s Clock) {
+	if w.document.GetOption("<") == "nil" {
+		return
+	}
+	name := "CLOCK"
+	w.WriteString(fmt.Sprintf(`<span class="tags">%s`, name))
+	w.WriteString(`</span>`)
+	bs, be := "&lsqb;", "&rsqb;"
+	w.WriteString(fmt.Sprintf(`<span class="timestamp">%s`, bs))
+	dt := s.Date
+	end := ""
+	if !dt.End.IsZero() {
+		end = "--" + bs + dt.End.Format("2006-01-02 Mon 15:04") + be
+	}
+	tm := bs + dt.Start.Format("2006-01-02 Mon 15:04") + be + end
+	w.WriteString(tm)
+	w.WriteString(`</span>`)
+}
+
 func (w *HTMLWriter) WriteRegularLink(l RegularLink) {
 	url := html.EscapeString(l.URL)
 	if l.Protocol == "file" {

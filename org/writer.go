@@ -41,6 +41,7 @@ type Writer interface {
 	WriteFootnoteLink(FootnoteLink)
 	WriteFootnoteDefinition(FootnoteDefinition)
 	WriteSDC(SDC)
+	WriteClock(Clock)
 	NodeIdx(int)
 	ResetLineBreak()
 }
@@ -117,6 +118,8 @@ func WriteNodesLB(offset int, w Writer, nodes ...Node) {
 			w.WriteFootnoteDefinition(n)
 		case SDC:
 			w.WriteSDC(n)
+		case Clock:
+			w.WriteClock(n)
 		default:
 			if n != nil {
 				panic(fmt.Sprintf("bad node %T %#v", n, n))

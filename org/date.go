@@ -389,6 +389,56 @@ func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 	return nil, nil
 }
 
+type OrgDateClock struct {
+	OrgDate
+	DurationMins int
+}
+
+/*
+	"""
+	Get CLOCK from given string.
+
+	Return three tuple (start, stop, length) which is datetime object
+	of start time, datetime object of stop time and length in minute.
+
+	"""
+*/
+
+var ClockRe = *regexp.MustCompile(`^((.*)CLOCK\:\s+)?\s*\[(?P<y1>\d+)\-(?P<mo1>\d+)\-(?P<d1>\d+)[^\]\d]*(?P<h1>\d+)\:(?P<m1>\d+)\]--(\[(?P<y2>\d+)\-(?P<mo2>\d+)\-(?P<d2>\d+)[^\]\d]*(?P<h2>\d+)\:(?P<m2>\d+)\]\s+=>\s+(?P<dd1>\d+)\:(?P<dd2>\d+))?`)
+
+func ParseClock(line string) *OrgDateClock {
+	match := MatchIRegEx(&ClockRe, line)
+	if match == nil {
+		return nil
+	}
+	var d1 time.Time
+	var d2 time.Time
+	var clk *OrgDateClock = nil
+	dd := 0
+	y := match["y1"]
+	if y != "" {
+		d1 = orgDateFromTuple([]string{y, match["mo1"], match["d1"], match["h1"], match["m1"]})
+	}
+	y = match["y2"]
+	if y != "" {
+		d2 = orgDateFromTuple([]string{y, match["mo2"], match["d2"], match["h2"], match["m2"]})
+	}
+	h := match["dd1"]
+	if h != "" {
+		hour := 0
+		mins := 0
+		if hr, err := strconv.Atoi(h); err != nil {
+			hour = hr
+		}
+		if mn, err := strconv.Atoi(match["dd2"]); err != nil {
+			mins = mn
+		}
+		dd = hour*60 + mins
+	}
+	clk = &OrgDateClock{OrgDate{Start: d1, End: d2, TimestampType: Inactive, HaveTime: true}, dd}
+	return clk
+}
+
 func lexDeadline(line string, row, col int) (token, bool) {
 	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col}
@@ -403,6 +453,15 @@ func lexScheduled(line string, row, col int) (token, bool) {
 		pos := Pos{row, col}
 		pos.Col += len(m[1])
 		return token{"scheduled", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
+	}
+	return nilToken, false
+}
+
+func lexClock(line string, row, col int) (token, bool) {
+	if m := ClockRe.FindStringSubmatch(line); m != nil {
+		pos := Pos{row, col}
+		pos.Col += len(m[1])
+		return token{"clock", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
@@ -518,6 +577,14 @@ func (self *OrgDate) ToString() string {
 		intNum = fmt.Sprintf("%d", self.WarnRule.Options.Interval)
 	}
 	return bs + self.Start.Format("2006-01-02 Mon 15:04") + self.RepeatPre + intNum + self.RepeatDWMY + self.WarnPre + wintNum + self.WarnDWMY + end + be
+}
+
+func (self *OrgDate) ToClockString() string {
+	end := ""
+	if !self.End.IsZero() {
+		end = "--[" + self.End.Format("2006-01-02 Mon 15:04") + "]"
+	}
+	return "[" + self.Start.Format("2006-01-02 Mon 15:04") + "]" + end
 }
 
 func (self *OrgDate) HasOverlap(other *OrgDate) bool {

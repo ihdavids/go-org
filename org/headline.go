@@ -75,6 +75,7 @@ type Headline struct {
 	CheckStatus *CheckStatus
 	Drawers     []*Drawer
 	Tables      []*Table
+	Clocks      []*Clock
 	// Schedules  []Schedule
 }
 
@@ -195,10 +196,24 @@ type SDC struct {
 	DateType DateType
 }
 
+type Clock struct {
+	Pos    Pos
+	EndPos Pos
+	Date   *OrgDateClock
+}
+
 func (self *SDC) IsZero() bool {
 	return self == nil || self.Date == nil || self.Date.IsZero()
 }
 
+func (d *Document) parseClock(i int, parentStop stopFn) (int, Node) {
+	clk := ParseClock(d.tokens[i].content)
+	tclk := Clock{d.tokens[i].Pos(), d.tokens[i].EndPos(), clk}
+	if d.Outline.last != nil && d.Outline.last.Headline != nil {
+		d.Outline.last.Headline.Clocks = append(d.Outline.last.Headline.Clocks, &tclk)
+	}
+	return 1, tclk
+}
 func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
 	s, dt := ParseSDC(d.tokens[i].content)
 	sdc := SDC{d.tokens[i].Pos(), d.tokens[i].EndPos(), s, dt}
@@ -308,3 +323,10 @@ func (n SDC) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
 func (n SDC) GetType() NodeType        { return SDCNode }
 func (n Headline) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
 func (n Headline) GetType() NodeType   { return HeadlineNode }
+
+func (n Clock) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n Clock) GetPos() Pos    { return n.Pos }
+func (n Clock) GetEnd() Pos    { return n.EndPos }
+
+func (n Clock) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+func (n Clock) GetType() NodeType   { return ClockNode }

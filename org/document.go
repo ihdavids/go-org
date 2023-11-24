@@ -89,6 +89,7 @@ const (
 	ExampleNode
 	BlockNode
 	ResultNode
+	ClockNode
 )
 
 func GetNodeTypeName(t NodeType) string {
@@ -161,6 +162,8 @@ func GetNodeTypeName(t NodeType) string {
 		return "block"
 	case ResultNode:
 		return "result"
+	case ClockNode:
+		return "clock"
 	}
 	return "undefined"
 }
@@ -213,6 +216,7 @@ var lexFns = []lexFn{
 	lexScheduled,
 	lexDeadline,
 	lexClosed,
+	lexClock,
 	lexText,
 }
 
@@ -382,6 +386,8 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 		consumed, node = d.parseDeadline(i, stop)
 	case "scheduled":
 		consumed, node = d.parseScheduled(i, stop)
+	case "clock":
+		consumed, node = d.parseClock(i, stop)
 	case "closed":
 		consumed, node = d.parseClosed(i, stop)
 	case "footnoteDefinition":
