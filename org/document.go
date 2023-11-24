@@ -259,6 +259,14 @@ func (d *Document) Write(w Writer) (out string, err error) {
 	return w.String(), err
 }
 
+func (d *Document) InsertNodeAfter(toInsert, after Node) {
+	for i, n := range d.Nodes {
+		if n == after {
+			d.Nodes = Insert(d.Nodes, toInsert, i+1)
+		}
+	}
+}
+
 // Parse parses the input into an AST (and some other helpful fields like Outline).
 // To allow method chaining, errors are stored in document.Error rather than being returned.
 func (c *Configuration) Parse(input io.Reader, path string) (d *Document) {

@@ -76,6 +76,7 @@ type Headline struct {
 	Drawers     []*Drawer
 	Tables      []*Table
 	Clocks      []*Clock
+	Doc         *Document
 	// Schedules  []Schedule
 }
 
@@ -106,7 +107,7 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	pos := d.tokens[i].Pos()
 	t, headline := d.tokens[i], Headline{Pos: pos, EndPos: d.tokens[i].EndPos()}
 	headline.Lvl = len(t.matches[1])
-
+	headline.Doc = d
 	headline.Index = d.addHeadline(&headline)
 
 	text := t.content
@@ -307,12 +308,14 @@ func (parent *Section) add(current *Section) {
 }
 
 func (h *Headline) AddDrawer(drawer *Drawer) {
+	var newNode Node = Node(drawer)
 	h.Drawers = append(h.Drawers, drawer)
 	if h.Children == nil {
 		h.Children = append(h.Children, drawer)
 	} else {
-		h.Children = Prepend(h.Children, Node(drawer))
+		h.Children = Prepend(h.Children, newNode)
 	}
+	h.Doc.InsertNodeAfter(newNode, h)
 }
 
 func (n Headline) String() string   { return orgWriter.WriteNodesAsString(n) }

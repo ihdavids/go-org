@@ -23,3 +23,18 @@ func isImageOrVideoLink(n Node) bool {
 func Prepend[T any](slice []T, elems ...T) []T {
 	return append(elems, slice...)
 }
+
+func Insert[T any](arr []T, value T, index int) []T {
+	if index > len(arr) {
+		return arr
+	}
+	if index == len(arr) {
+		return append(arr, value)
+	} else if index > 0 {
+		arr = append(arr[:index+1], arr[index:]...)
+		arr[index] = value
+		return arr
+	} else {
+		return Prepend(arr, value)
+	}
+}

@@ -158,8 +158,14 @@ func (d *PropertyDrawer) Append(key string, val string) {
 	}
 }
 
-func (n *Drawer) Append(node Node) {
+func (n *Drawer) Append(h *Headline, node Node) {
+	var after Node = n
+	if len(n.Children) > 0 {
+		after = n.Children[len(n.Children)-1]
+	}
+	// This is greate but it still has to be added to our nodes list
 	n.Children = append(n.Children, node)
+	h.Doc.InsertNodeAfter(node, after)
 }
 
 func (n Drawer) String() string         { return orgWriter.WriteNodesAsString(n) }
