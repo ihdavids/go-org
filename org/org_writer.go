@@ -268,6 +268,7 @@ func (w *OrgWriter) WriteClock(s Clock) {
 	name := "CLOCK"
 	hours := s.Date.DurationMins / 60
 	mins := s.Date.DurationMins % 60
+	w.WriteIndent()
 	w.WriteString(fmt.Sprintf("%s: %s => %d:%02d\n", name, s.Date.ToClockString(), hours, mins))
 	w.SetLineBreak()
 }
