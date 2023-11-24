@@ -70,6 +70,8 @@ func WriteNodesLB(offset int, w Writer, nodes ...Node) {
 			w.WriteNodeWithName(n)
 		case Headline:
 			w.WriteHeadline(n)
+		case *Headline:
+			w.WriteHeadline(*n)
 		case Block:
 			w.WriteBlock(n)
 		case Result:
@@ -80,8 +82,12 @@ func WriteNodesLB(offset int, w Writer, nodes ...Node) {
 			w.WriteExample(n)
 		case Drawer:
 			w.WriteDrawer(n)
+		case *Drawer:
+			w.WriteDrawer(*n)
 		case PropertyDrawer:
 			w.WritePropertyDrawer(n)
+		case *PropertyDrawer:
+			w.WritePropertyDrawer(*n)
 		case List:
 			w.WriteList(n)
 		case ListItem:
@@ -90,6 +96,8 @@ func WriteNodesLB(offset int, w Writer, nodes ...Node) {
 			w.WriteDescriptiveListItem(n)
 		case Table:
 			w.WriteTable(n)
+		case *Table:
+			w.WriteTable(*n)
 		case HorizontalRule:
 			w.WriteHorizontalRule(n)
 		case Paragraph:

@@ -55,7 +55,7 @@ func TestOrgRangesTable(t *testing.T) {
 				t.Errorf("Table end does not match up! %v vs %v", c.GetEnd(), tableEnd)
 			}
 			//fmt.Printf("%v : %v \n%v\n", c.GetPos(), c.GetEnd(), c.String())
-			tbl := c.(Table)
+			tbl := c.(*Table)
 			for ridx, r := range tbl.Rows {
 				for cidx, col := range r.Columns {
 					starts += fmt.Sprintf("%v,", col.GetPos())

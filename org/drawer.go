@@ -38,7 +38,7 @@ func (d *Document) parseDrawer(i int, parentStop stopFn) (int, Node) {
 	if name == "PROPERTIES" {
 		return d.parsePropertyDrawer(i, parentStop)
 	}
-	drawer, start := Drawer{Pos: d.tokens[i].Pos(), Name: name}, i
+	drawer, start := &Drawer{Pos: d.tokens[i].Pos(), Name: name}, i
 	i++
 	stop := func(d *Document, i int) bool {
 		if parentStop(d, i) {
@@ -82,7 +82,7 @@ func (d *Document) parseDrawer(i int, parentStop stopFn) (int, Node) {
 }
 
 func (d *Document) parsePropertyDrawer(i int, parentStop stopFn) (int, Node) {
-	drawer, start := PropertyDrawer{Pos: d.tokens[i].Pos()}, i
+	drawer, start := &PropertyDrawer{Pos: d.tokens[i].Pos()}, i
 	i++
 	stop := func(d *Document, i int) bool {
 		return parentStop(d, i) || (d.tokens[i].kind != "text" && d.tokens[i].kind != "beginDrawer")

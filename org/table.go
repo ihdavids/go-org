@@ -82,7 +82,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos()}
+	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos()}
 	var starts []Pos
 	var ends []Pos
 	for r, rawColumns := range rawRows {
