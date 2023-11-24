@@ -259,6 +259,9 @@ func (w *OrgWriter) WriteSDC(s SDC) {
 		name = "CLOSED"
 		break
 	}
+	if w.IsAfterNewline() {
+		w.WriteIndent()
+	}
 	w.WriteString(fmt.Sprintf("%s: %s\n", name, s.Date.ToString()))
 	w.SetLineBreak()
 }
