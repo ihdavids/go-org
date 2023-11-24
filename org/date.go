@@ -2,6 +2,7 @@ package org
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -405,6 +406,13 @@ type OrgDateClock struct {
 */
 
 var ClockRe = *regexp.MustCompile(`^((.*)CLOCK\:\s+)?\s*\[(?P<y1>\d+)\-(?P<mo1>\d+)\-(?P<d1>\d+)[^\]\d]*(?P<h1>\d+)\:(?P<m1>\d+)\]--(\[(?P<y2>\d+)\-(?P<mo2>\d+)\-(?P<d2>\d+)[^\]\d]*(?P<h2>\d+)\:(?P<m2>\d+)\]\s+=>\s+(?P<dd1>\d+)\:(?P<dd2>\d+))?`)
+
+func (s *OrgDateClock) RecalcDuration() {
+	if !s.End.IsZero() && !s.Start.IsZero() {
+		diff := s.End.Sub(s.Start)
+		s.DurationMins = int(math.Round(diff.Minutes()))
+	}
+}
 
 func ParseClock(line string) *OrgDateClock {
 	match := MatchIRegEx(&ClockRe, line)
