@@ -324,8 +324,24 @@ func (n Headline) GetTokenEnd() Pos { return n.EndPos }
 func (n Headline) GetEnd() Pos {
 	if len(n.Children) > 0 {
 		return n.Children[len(n.Children)-1].GetEnd()
+	} else {
+		end := n.GetTokenEnd()
+		if n.Properties != nil {
+			pend := n.Properties.GetEnd()
+			if pend.Row > end.Row {
+				end = pend
+			}
+		}
+		if n.Drawers != nil {
+			for _, d := range n.Drawers {
+				pend := d.GetEnd()
+				if pend.Row > end.Row {
+					end = pend
+				}
+			}
+		}
+		return end
 	}
-	return n.GetTokenEnd()
 }
 func (n SDC) String() string { return orgWriter.WriteNodesAsString(n) }
 func (n SDC) GetPos() Pos    { return n.Pos }
