@@ -494,6 +494,9 @@ func (w *OrgWriter) WriteExplicitLineBreak(l ExplicitLineBreak) {
 }
 
 func (w *OrgWriter) WriteTimestamp(t Timestamp) {
+	if w.IsAfterNewline() {
+		w.WriteIndent()
+	}
 	w.WriteString(t.Time.ToString())
 }
 
