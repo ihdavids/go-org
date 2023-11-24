@@ -264,6 +264,7 @@ func (w *OrgWriter) WriteSDC(s SDC) {
 }
 
 func (w *OrgWriter) WriteClock(s Clock) {
+	s.Date.RecalcDuration()
 	name := "CLOCK"
 	hours := s.Date.DurationMins / 60
 	mins := s.Date.DurationMins % 60

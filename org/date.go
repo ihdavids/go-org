@@ -435,10 +435,10 @@ func ParseClock(line string) *OrgDateClock {
 	if h != "" {
 		hour := 0
 		mins := 0
-		if hr, err := strconv.Atoi(h); err != nil {
+		if hr, err := strconv.Atoi(h); err == nil {
 			hour = hr
 		}
-		if mn, err := strconv.Atoi(match["dd2"]); err != nil {
+		if mn, err := strconv.Atoi(match["dd2"]); err == nil {
 			mins = mn
 		}
 		dd = hour*60 + mins
