@@ -28,6 +28,8 @@ type Example struct {
 var exampleLineRegexp = regexp.MustCompile(`^(\s*):(\s(.*)|\s*$)`)
 var beginBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+BEGIN_(\w+)(.*)`)
 var endBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END_(\w+)`)
+var beginDynBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+BEGIN\b(.*)`)
+var endDynBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END\b`)
 var resultRegexp = regexp.MustCompile(`(?i)^(\s*)#\+RESULTS:`)
 var exampleBlockEscapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*),([ \t]*)(\*|,\*|#\+|,#\+)`)
 
@@ -38,6 +40,12 @@ func lexBlock(line string, row, col int) (token, bool) {
 	} else if m := endBlockRegexp.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col + len(m[1])}
 		return token{"endBlock", len(m[1]), strings.ToUpper(m[2]), m, pos, Pos{row, col + len(m[0])}}, true
+	} else if m := beginDynBlockRegexp.FindStringSubmatch(line); m != nil {
+		pos := Pos{row, col + len(m[1])}
+		return token{"beginBlock", len(m[1]), strings.ToUpper("DYN"), m, pos, Pos{row, col + len(m[0])}}, true
+	} else if m := endDynBlockRegexp.FindStringSubmatch(line); m != nil {
+		pos := Pos{row, col + len(m[1])}
+		return token{"endBlock", len(m[1]), strings.ToUpper("DYN"), m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
@@ -67,7 +75,13 @@ func isRawTextBlock(name string) bool { return name == "SRC" || name == "EXAMPLE
 
 func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 	t, start := d.tokens[i], i
-	name, parameters := t.content, splitParameters(t.matches[3])
+	name := t.content
+	var parameters []string
+	if name == "DYN" {
+		parameters = splitParameters(t.matches[2])
+	} else {
+		parameters = splitParameters(t.matches[3])
+	}
 	trim := trimIndentUpTo(d.tokens[i].lvl)
 	stop := func(d *Document, i int) bool {
 		return i >= len(d.tokens) || (d.tokens[i].kind == "endBlock" && d.tokens[i].content == name)
