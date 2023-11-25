@@ -72,7 +72,7 @@ func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 	stop := func(d *Document, i int) bool {
 		return i >= len(d.tokens) || (d.tokens[i].kind == "endBlock" && d.tokens[i].content == name)
 	}
-	block, i := Block{name, d.tokens[start].Pos(), d.tokens[start].EndPos(), parameters, nil, nil}, i+1
+	block, i := &Block{name, d.tokens[start].Pos(), d.tokens[start].EndPos(), parameters, nil, nil}, i+1
 	if isRawTextBlock(name) {
 		rawText := ""
 		for ; !stop(d, i); i++ {
@@ -198,3 +198,7 @@ func (n Result) GetType() NodeType  { return ResultNode }
 func (n Example) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
 func (n Block) GetTypeName() string   { return GetNodeTypeName(n.GetType()) }
 func (n Result) GetTypeName() string  { return GetNodeTypeName(n.GetType()) }
+
+func (n Example) GetChildren() []Node { return n.Children }
+func (n Block) GetChildren() []Node   { return n.Children }
+func (n Result) GetChildren() []Node  { return nil }

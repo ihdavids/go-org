@@ -45,3 +45,5 @@ func (n FootnoteDefinition) GetEnd() Pos {
 
 func (n FootnoteDefinition) GetType() NodeType   { return FootnoteDefinitionNode }
 func (n FootnoteDefinition) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+
+func (n FootnoteDefinition) GetChildren() []Node { return n.Children }

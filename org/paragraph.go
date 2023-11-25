@@ -64,3 +64,6 @@ func (n Paragraph) GetType() NodeType        { return ParagraphNode }
 func (n Paragraph) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
 func (n HorizontalRule) GetType() NodeType   { return HorizontalRuleNode }
 func (n HorizontalRule) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+
+func (n Paragraph) GetChildren() []Node      { return n.Children }
+func (n HorizontalRule) GetChildren() []Node { return nil }

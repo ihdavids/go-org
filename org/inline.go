@@ -550,3 +550,15 @@ func (n FootnoteLink) GetTypeName() string      { return GetNodeTypeName(n.GetTy
 func (n RegularLink) GetTypeName() string       { return GetNodeTypeName(n.GetType()) }
 func (n Macro) GetTypeName() string             { return GetNodeTypeName(n.GetType()) }
 func (n Timestamp) GetTypeName() string         { return GetNodeTypeName(n.GetType()) }
+
+func (n Text) GetChildren() []Node              { return nil }
+func (n LineBreak) GetChildren() []Node         { return nil }
+func (n ExplicitLineBreak) GetChildren() []Node { return nil }
+func (n StatisticToken) GetChildren() []Node    { return nil }
+func (n Emphasis) GetChildren() []Node          { return n.Content }
+func (n InlineBlock) GetChildren() []Node       { return n.Children }
+func (n LatexFragment) GetChildren() []Node     { return n.Content }
+func (n FootnoteLink) GetChildren() []Node      { return nil }
+func (n RegularLink) GetChildren() []Node       { return n.Description }
+func (n Macro) GetChildren() []Node             { return nil }
+func (n Timestamp) GetChildren() []Node         { return nil }

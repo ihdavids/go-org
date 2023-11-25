@@ -216,3 +216,9 @@ func (n Column) GetType() NodeType { return TableColNode }
 func (n Table) GetTypeName() string  { return GetNodeTypeName(n.GetType()) }
 func (n Row) GetTypeName() string    { return GetNodeTypeName(n.GetType()) }
 func (n Column) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+
+func (n Table) GetChildren() []Node { return nil }
+
+// These are not actually nodes
+func (n Row) GetChildren() []Column  { return n.Columns }
+func (n Column) GetChildren() []Node { return n.Children }

@@ -76,6 +76,7 @@ type Headline struct {
 	Drawers     []*Drawer
 	Tables      []*Table
 	Clocks      []*Clock
+	Blocks      []*Block
 	Doc         *Document
 	// Schedules  []Schedule
 }
@@ -182,6 +183,8 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 			headline.Drawers = append(headline.Drawers, d)
 		} else if d, ok := nodes[0].(*Table); ok {
 			headline.Tables = append(headline.Tables, d)
+		} else if d, ok := nodes[0].(*Block); ok {
+			headline.Blocks = append(headline.Blocks, d)
 		}
 	}
 	headline.Children = nodes
@@ -358,3 +361,7 @@ func (n Clock) GetEnd() Pos    { return n.EndPos }
 
 func (n Clock) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
 func (n Clock) GetType() NodeType   { return ClockNode }
+
+func (n SDC) GetChildren() []Node      { return nil }
+func (n Headline) GetChildren() []Node { return n.Children }
+func (n Clock) GetChildren() []Node    { return nil }

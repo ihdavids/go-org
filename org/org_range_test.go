@@ -247,7 +247,7 @@ func TestOrgRangesResult(t *testing.T) {
 	for _, c := range h.Headline.Children {
 		//fmt.Printf("%v : %v - %v\n%v\n", c.GetPos(), c.GetEnd(), c.GetTypeName(), c.String())
 		if c.GetType() == BlockNode {
-			b := c.(Block)
+			b := c.(*Block)
 			r := b.Result
 			if r.GetPos() != objStart {
 				t.Errorf("Result start does not match up! %v vs %v", r.GetPos(), objStart)

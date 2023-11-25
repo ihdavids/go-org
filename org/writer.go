@@ -74,10 +74,14 @@ func WriteNodesLB(offset int, w Writer, nodes ...Node) {
 			w.WriteHeadline(*n)
 		case Block:
 			w.WriteBlock(n)
+		case *Block:
+			w.WriteBlock(*n)
 		case Result:
 			w.WriteResult(n)
 		case InlineBlock:
 			w.WriteInlineBlock(n)
+		case *InlineBlock:
+			w.WriteInlineBlock(*n)
 		case Example:
 			w.WriteExample(n)
 		case Drawer:

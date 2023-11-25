@@ -175,6 +175,7 @@ type Node interface {
 	GetEnd() Pos         // Position of next token in stream
 	GetType() NodeType   // What type of node are we?
 	GetTypeName() string // Descriptive name of node type
+	GetChildren() []Node // Returns any children of this node.
 }
 
 type lexFn = func(line string, row, col int) (t token, ok bool)

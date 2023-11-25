@@ -231,3 +231,9 @@ func (n Keyword) GetTypeName() string      { return GetNodeTypeName(n.GetType())
 func (n NodeWithMeta) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
 func (n NodeWithName) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
 func (n Include) GetTypeName() string      { return GetNodeTypeName(n.GetType()) }
+
+func (n Comment) GetChildren() []Node      { return nil }
+func (n Keyword) GetChildren() []Node      { return nil }
+func (n NodeWithMeta) GetChildren() []Node { return nil }
+func (n NodeWithName) GetChildren() []Node { return nil }
+func (n Include) GetChildren() []Node      { return nil }

@@ -166,3 +166,7 @@ func (n DescriptiveListItem) GetType() NodeType { return DescriptiveListItemNode
 func (n List) GetTypeName() string                { return GetNodeTypeName(n.GetType()) }
 func (n ListItem) GetTypeName() string            { return GetNodeTypeName(n.GetType()) }
 func (n DescriptiveListItem) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+
+func (n List) GetChildren() []Node                { return n.Items }
+func (n ListItem) GetChildren() []Node            { return n.Children }
+func (n DescriptiveListItem) GetChildren() []Node { return n.Details }

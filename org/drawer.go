@@ -183,3 +183,6 @@ func (n Drawer) GetType() NodeType           { return DrawerNode }
 func (n Drawer) GetTypeName() string         { return GetNodeTypeName(n.GetType()) }
 func (n PropertyDrawer) GetType() NodeType   { return PropertyDrawerNode }
 func (n PropertyDrawer) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
+
+func (n Drawer) GetChildren() []Node         { return n.Children }
+func (n PropertyDrawer) GetChildren() []Node { return nil }
