@@ -141,7 +141,11 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 func (w *OrgWriter) WriteBlock(b Block) {
 	idx := w.Idx
 	w.WriteIndent()
-	w.WriteString("#+BEGIN_" + b.Name)
+	if b.Name == "DYN" {
+		w.WriteString("#+BEGIN")
+	} else {
+		w.WriteString("#+BEGIN_" + b.Name)
+	}
 	if len(b.Parameters) != 0 {
 		w.WriteString(" " + strings.Join(b.Parameters, " "))
 	}
@@ -168,7 +172,11 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	//if !isRawTextBlock(b.Name) {
 	w.WriteIndent()
 	//}
-	w.WriteString("#+END_" + b.Name + "\n")
+	if b.Name == "DYN" {
+		w.WriteString("#+END\n")
+	} else {
+		w.WriteString("#+END_" + b.Name + "\n")
+	}
 
 	if b.Result != nil {
 		w.WriteString("\n")
