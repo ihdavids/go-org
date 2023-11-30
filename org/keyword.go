@@ -89,6 +89,8 @@ func (d *Document) parseKeyword(i int, stop stopFn) (int, Node) {
 			return consumed, node
 		}
 		fallthrough
+	case "TBLFMT":
+		return d.parseTableFormat(k)
 	default:
 		if _, ok := d.BufferSettings[k.Key]; ok {
 			d.BufferSettings[k.Key] = strings.Join([]string{d.BufferSettings[k.Key], k.Value}, "\n")
@@ -97,6 +99,26 @@ func (d *Document) parseKeyword(i int, stop stopFn) (int, Node) {
 		}
 		return 1, k
 	}
+}
+
+func Last[E any](s []E) (E, bool) {
+	if len(s) == 0 {
+		var zero E
+		return zero, false
+	}
+	return s[len(s)-1], true
+}
+
+func (d *Document) parseTableFormat(k Keyword) (int, Node) {
+	if len(d.currentHeadline.Tables) > 0 {
+		// Modern org mode allows for multiple TBLFM statements one after another.
+		if d.currentHeadline.Tables[len(d.currentHeadline.Tables)-1].Formulas == nil {
+			d.currentHeadline.Tables[len(d.currentHeadline.Tables)-1].Formulas = &Formulas{Keywords: []*Keyword{&k}}
+		} else {
+			d.currentHeadline.Tables[len(d.currentHeadline.Tables)-1].Formulas.AppendKeyword(&k)
+		}
+	}
+	return 1, k
 }
 
 func (d *Document) parseNodeWithName(k Keyword, i int, stop stopFn) (int, Node) {

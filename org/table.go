@@ -7,11 +7,16 @@ import (
 	"unicode/utf8"
 )
 
+type Formulas struct {
+	Keywords []*Keyword
+	Formulas []*Formula
+}
 type Table struct {
 	Rows             []Row
 	ColumnInfos      []ColumnInfo
 	SeparatorIndices []int
 	Pos              Pos
+	Formulas         *Formulas
 }
 
 type Row struct {
@@ -82,7 +87,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos()}
+	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil}
 	var starts []Pos
 	var ends []Pos
 	for r, rawColumns := range rawRows {
@@ -174,6 +179,271 @@ func isSpecialRow(rawColumns []string) bool {
 		}
 	}
 	return isAlignRow
+}
+
+//////////////////// FORMULA MANAGEMENT //////////////////////////////////////////////
+
+type Formula struct {
+	Keyword         *Keyword
+	FormulaStr      string
+	SubKeywordIndex int
+	Target          *FormulaTarget
+	Expr            string
+	Valid           bool
+}
+
+type RowColRef struct {
+	Row int
+	Col int
+}
+
+type FormulaTarget struct {
+	Raw   string
+	Start RowColRef
+	End   RowColRef
+}
+
+func (s *Formulas) AppendKeyword(k *Keyword) {
+	if k != nil {
+		s.Keywords = append(s.Keywords, k)
+	}
+}
+
+var tableTargetRe = regexp.MustCompile(`\s*(([@](?P<rowonly>[-]?[0-9><]+))|([$](?P<colonly>[-]?[0-9><]+))|([@](?P<row>[-]?[0-9><]+)[$](?P<col>[-]?[0-9><]+)))\s*$`)
+
+func MakeRowColDef(s string) RowColRef {
+	r := RowColRef{}
+	if m := tableTargetRe.FindStringSubmatch(s); m != nil {
+		if m[1] != "" {
+			r.Row, _ = strconv.Atoi(m[1])
+			r.Col = -1
+		} else if m[2] == "" {
+			r.Row = -1
+			r.Col, _ = strconv.Atoi(m[2])
+		} else {
+			r.Row, _ = strconv.Atoi(m[3])
+			r.Col, _ = strconv.Atoi(m[4])
+		}
+	}
+	return r
+}
+
+func (s *FormulaTarget) Process() {
+	if s.Raw != "" {
+		temp := strings.Split(s.Raw, "..")
+		if len(temp) == 1 {
+			s.Start = MakeRowColDef(temp[0])
+			s.End = s.Start
+		} else {
+			s.Start = MakeRowColDef(temp[0])
+			s.End = MakeRowColDef(temp[1])
+		}
+	}
+}
+
+func (s *FormulaTarget) IsRowRange() bool {
+	return s.IsEntireRow() || (s.Start.Row != s.End.Row && s.Start.Col == s.End.Col)
+}
+
+func (s *FormulaTarget) IsColRange() bool {
+	return s.IsEntireCol() || (s.Start.Row == s.End.Row && s.Start.Col != s.End.Col)
+}
+
+func (s *FormulaTarget) IsEntireRow() bool {
+	return s.Start.Col == -1
+}
+
+func (s *FormulaTarget) IsEntireCol() bool {
+	return s.Start.Row == -1
+}
+
+func (s *FormulaTarget) IsPositiveRange() bool {
+	if s.IsColRange() && !s.IsEntireCol() {
+		return s.Start.Col <= s.End.Col
+	}
+	if s.IsRowRange() && !s.IsEntireRow() {
+		return s.Start.Row <= s.End.Row
+	}
+	return true
+}
+
+func CreatePosIterator(rs, re int) func() int {
+	strt := rs - 1
+	end := re
+	return func() int {
+		if strt > end {
+			return -1
+		}
+		strt += 1
+		return strt
+	}
+}
+
+func CreateNegIterator(rs, re int) func() int {
+	strt := rs + 1
+	end := re
+	return func() int {
+		if strt < end {
+			return -1
+		}
+		strt -= 1
+		return strt
+	}
+}
+
+func ClampToMinMax(sr int, max int) int {
+	if sr <= 0 {
+		return 1
+	}
+	if sr > max {
+		return max
+	}
+	return sr
+}
+
+// This bugbear returns an iterator that can iterate over a range given a table.
+func (s *FormulaTarget) CreateIterator(tbl *Table) func() *RowColRef {
+	if tbl == nil {
+		return func() *RowColRef {
+			return nil
+		}
+	}
+	cur := &RowColRef{Row: s.Start.Row, Col: s.End.Col}
+	maxRows := len(tbl.Rows)
+	maxCols := 0
+	if maxRows > 0 {
+		maxCols = len(tbl.Rows[0].Columns)
+	}
+	if s.IsColRange() {
+		if s.IsPositiveRange() {
+			sv := ClampToMinMax(s.Start.Row, maxRows)
+			if !s.IsEntireCol() {
+				maxRows = ClampToMinMax(s.End.Row, maxRows)
+			}
+			it := CreatePosIterator(sv, maxRows)
+			return func() *RowColRef {
+				cur.Row = it()
+				if cur.Row == -1 {
+					return nil
+				}
+				return cur
+			}
+		} else {
+			minRows := 1
+			sv := ClampToMinMax(s.Start.Row, maxRows)
+			if !s.IsEntireCol() {
+				minRows = ClampToMinMax(s.End.Row, maxRows)
+			}
+			it := CreateNegIterator(sv, minRows)
+			return func() *RowColRef {
+				cur.Row = it()
+				if cur.Row == -1 {
+					return nil
+				}
+				return cur
+			}
+		}
+	} else if s.IsRowRange() {
+		if s.IsPositiveRange() {
+			sv := ClampToMinMax(s.Start.Col, maxCols)
+			if !s.IsEntireRow() {
+				maxCols = ClampToMinMax(s.End.Col, maxCols)
+			}
+			it := CreatePosIterator(sv, maxCols)
+			return func() *RowColRef {
+				cur.Col = it()
+				if cur.Col == -1 {
+					return nil
+				}
+				return cur
+			}
+		} else {
+			minCols := 1
+			sv := ClampToMinMax(s.Start.Col, maxCols)
+			if !s.IsEntireRow() {
+				minCols = ClampToMinMax(s.End.Col, maxCols)
+			}
+			it := CreateNegIterator(sv, minCols)
+			return func() *RowColRef {
+				cur.Col = it()
+				if cur.Col == -1 {
+					return nil
+				}
+				return cur
+			}
+		}
+	} else {
+		if s.IsPositiveRange() {
+			sr := ClampToMinMax(s.Start.Row, maxRows)
+			sc := ClampToMinMax(s.Start.Col, maxCols)
+			er := ClampToMinMax(s.End.Row, maxRows)
+			ec := ClampToMinMax(s.End.Col, maxCols)
+			rit := CreatePosIterator(sr, er)
+			cit := CreatePosIterator(sc, ec)
+			cur.Col = cit()
+			return func() *RowColRef {
+				cur.Row = rit()
+				if cur.Row == -1 {
+					cur.Col = cit()
+					if cur.Col == -1 {
+						return nil
+					}
+					rit = CreatePosIterator(sr, er)
+					cur.Row = rit()
+				}
+				return cur
+			}
+		} else {
+			sr := ClampToMinMax(s.Start.Row, maxRows)
+			sc := ClampToMinMax(s.Start.Col, maxCols)
+			er := ClampToMinMax(s.End.Row, maxRows)
+			ec := ClampToMinMax(s.End.Col, maxCols)
+			rit := CreateNegIterator(sr, er)
+			cit := CreateNegIterator(sc, ec)
+			return func() *RowColRef {
+				cur.Row = rit()
+				if cur.Row == -1 {
+					cur.Col = cit()
+					if cur.Col == -1 {
+						return nil
+					}
+					rit = CreateNegIterator(sr, er)
+					cur.Row = rit()
+				}
+				return cur
+			}
+		}
+	}
+}
+
+func (s *Formula) Process() {
+	tempStr := strings.Split(s.FormulaStr, "=")
+	if len(tempStr) == 2 {
+		s.Valid = true
+		s.Target = &FormulaTarget{Raw: strings.TrimSpace(tempStr[0])}
+		s.Target.Process()
+		s.Expr = tempStr[1]
+	}
+}
+
+func (s *Formulas) Process() {
+	if len(s.Formulas) <= 0 {
+		return
+	}
+	// First build a giant list of all our known formulas
+	frms := []*Formula{}
+	for _, k := range s.Keywords {
+		tempFormulas := strings.Split(k.Value, "::")
+		for i, f := range tempFormulas {
+			f = strings.TrimSpace(f)
+			if f != "" {
+				frm := &Formula{FormulaStr: f, Keyword: k, SubKeywordIndex: i}
+				frm.Process()
+				frms = append(frms, frm)
+			}
+		}
+	}
+	s.Formulas = frms
 }
 
 func (self Row) GetEnd() Pos {
