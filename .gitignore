@@ -2,3 +2,5 @@
 /go-org
 /fuzz
 /org-fuzz.zip
+*_result_out.html
+*_result_out.org
