@@ -34,6 +34,27 @@ type Configuration struct {
 	ReadFile            func(filename string) ([]byte, error) // ReadFile is used to read e.g. #+INCLUDE files.
 }
 
+type HeadlineStack []*Headline
+
+func (self *HeadlineStack) Push(val *Headline) {
+	*self = append(*self, val)
+}
+
+func (self *HeadlineStack) Pop() *Headline {
+	n := len(*self) - 1
+	r := (*self)[n]
+	(*self)[n] = nil
+	*self = (*self)[:n]
+	return r
+}
+
+func (self *HeadlineStack) Get() *Headline {
+	if len(*self) > 0 {
+		return (*self)[len(*self)-1]
+	}
+	return nil
+}
+
 // Document contains the parsing results and a pointer to the Configuration.
 type Document struct {
 	*Configuration
@@ -47,7 +68,7 @@ type Document struct {
 	Outline         Outline           // Outline is a Table Of Contents for the document and contains all sections (headline + content).
 	BufferSettings  map[string]string // Settings contains all settings that were parsed from keywords.
 	Error           error
-	currentHeadline *Headline
+	currentHeadline HeadlineStack
 }
 
 type NodeType int

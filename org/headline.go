@@ -110,6 +110,7 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	headline.Lvl = len(t.matches[1])
 	headline.Doc = d
 	headline.Index = d.addHeadline(headline)
+	d.currentHeadline.Push(headline)
 
 	text := t.content
 	todoKeywords := trimFastTags(
@@ -186,8 +187,8 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 	headline.Children = nodes
-	d.currentHeadline = headline
 	d.Outline.lastHash.Pop()
+	d.currentHeadline.Pop()
 	return consumed + 1, headline
 }
 
