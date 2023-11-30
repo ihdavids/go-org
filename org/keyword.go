@@ -89,7 +89,7 @@ func (d *Document) parseKeyword(i int, stop stopFn) (int, Node) {
 			return consumed, node
 		}
 		fallthrough
-	case "TBLFMT":
+	case "TBLFM":
 		return d.parseTableFormat(k)
 	default:
 		if _, ok := d.BufferSettings[k.Key]; ok {
