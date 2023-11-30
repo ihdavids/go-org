@@ -110,7 +110,7 @@ func Last[E any](s []E) (E, bool) {
 }
 
 func (d *Document) parseTableFormat(k Keyword) (int, Node) {
-	if len(d.currentHeadline.Tables) > 0 {
+	if d != nil && d.currentHeadline != nil && d.currentHeadline.Tables != nil && len(d.currentHeadline.Tables) > 0 {
 		// Modern org mode allows for multiple TBLFM statements one after another.
 		if d.currentHeadline.Tables[len(d.currentHeadline.Tables)-1].Formulas == nil {
 			d.currentHeadline.Tables[len(d.currentHeadline.Tables)-1].Formulas = &Formulas{Keywords: []*Keyword{&k}}

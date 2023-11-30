@@ -181,8 +181,6 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 			nodes = nodes[1:]
 		} else if d, ok := nodes[0].(*Drawer); ok {
 			headline.Drawers = append(headline.Drawers, d)
-		} else if d, ok := nodes[0].(*Table); ok {
-			headline.Tables = append(headline.Tables, d)
 		} else if d, ok := nodes[0].(*Block); ok {
 			headline.Blocks = append(headline.Blocks, d)
 		}

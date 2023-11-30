@@ -121,6 +121,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 		table.Rows = append(table.Rows, row)
 	}
+	d.currentHeadline.Tables = append(d.currentHeadline.Tables, table)
 	return i - start, table
 }
 
