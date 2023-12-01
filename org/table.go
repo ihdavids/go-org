@@ -191,7 +191,7 @@ func (s *Table) GetRealRowCol(row, col int) (int, int) {
 		if r.IsSpecial {
 			specialCount += 1
 		}
-		if (i + 1) == row+specialCount {
+		if (i + 1) == (row + specialCount) {
 			return i, (col - 1)
 		}
 	}
