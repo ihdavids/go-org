@@ -259,20 +259,21 @@ func (s *Formulas) AppendKeyword(k *Keyword) {
 	}
 }
 
+// Tricky nesting here, watch out for indexs
 var tableTargetRe = regexp.MustCompile(`\s*(([@](?P<rowonly>[-]?[0-9><]+))|([$](?P<colonly>[-]?[0-9><]+))|([@](?P<row>[-]?[0-9><]+)[$](?P<col>[-]?[0-9><]+)))\s*$`)
 
 func MakeRowColDef(s string) RowColRef {
 	r := RowColRef{}
 	if m := tableTargetRe.FindStringSubmatch(s); m != nil {
-		if m[1] != "" {
-			r.Row, _ = strconv.Atoi(m[1])
-			r.Col = -1
-		} else if m[2] == "" {
-			r.Row = -1
-			r.Col, _ = strconv.Atoi(m[2])
-		} else {
+		if m[3] != "" {
 			r.Row, _ = strconv.Atoi(m[3])
-			r.Col, _ = strconv.Atoi(m[4])
+			r.Col = -1
+		} else if m[5] != "" {
+			r.Row = -1
+			r.Col, _ = strconv.Atoi(m[5])
+		} else {
+			r.Row, _ = strconv.Atoi(m[7])
+			r.Col, _ = strconv.Atoi(m[8])
 		}
 	}
 	return r
