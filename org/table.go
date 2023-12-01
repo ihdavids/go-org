@@ -477,7 +477,7 @@ func (s *Formula) Process() {
 }
 
 func (s *Formulas) Process() {
-	if len(s.Formulas) <= 0 {
+	if len(s.Formulas) > 0 {
 		return
 	}
 	// First build a giant list of all our known formulas
