@@ -322,7 +322,7 @@ func CreatePosIterator(rs, re int) func() int {
 	strt := rs - 1
 	end := re
 	return func() int {
-		if strt > end {
+		if strt >= end {
 			return -1
 		}
 		strt += 1
@@ -334,7 +334,7 @@ func CreateNegIterator(rs, re int) func() int {
 	strt := rs + 1
 	end := re
 	return func() int {
-		if strt < end {
+		if strt <= end {
 			return -1
 		}
 		strt -= 1
