@@ -613,7 +613,7 @@ func (w *HTMLWriter) WriteTable(t Table) {
 	w.WriteString("</tbody>\n</table>\n")
 }
 
-func (w *HTMLWriter) writeTableColumns(columns []Column, tag string) {
+func (w *HTMLWriter) writeTableColumns(columns []*Column, tag string) {
 	w.WriteString("<tr>\n")
 	for _, column := range columns {
 		if column.Align == "" {

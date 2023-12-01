@@ -12,7 +12,7 @@ type Formulas struct {
 	Formulas []*Formula
 }
 type Table struct {
-	Rows             []Row
+	Rows             []*Row
 	ColumnInfos      []ColumnInfo
 	SeparatorIndices []int
 	Pos              Pos
@@ -20,7 +20,7 @@ type Table struct {
 }
 
 type Row struct {
-	Columns   []Column
+	Columns   []*Column
 	IsSpecial bool
 }
 
@@ -91,7 +91,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	var starts []Pos
 	var ends []Pos
 	for r, rawColumns := range rawRows {
-		row := Row{nil, isSpecialRow(rawColumns)}
+		row := &Row{nil, isSpecialRow(rawColumns)}
 		if rowStartPositions[r] != nil {
 			starts = rowStartPositions[r]
 			ends = rowEndPositions[r]
@@ -112,7 +112,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 				if ends != nil && i < len(ends) {
 					e = ends[i]
 				}
-				column := Column{s, e, nil, &table.ColumnInfos[i]}
+				column := &Column{s, e, nil, &table.ColumnInfos[i]}
 				if i < len(rawColumns) {
 					column.Children = d.parseInline(rawColumns[i], start) // TODO: This is off by the row index
 				}
@@ -541,5 +541,5 @@ func (n Column) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
 func (n Table) GetChildren() []Node { return nil }
 
 // These are not actually nodes
-func (n Row) GetChildren() []Column  { return n.Columns }
+func (n Row) GetChildren() []*Column { return n.Columns }
 func (n Column) GetChildren() []Node { return n.Children }
