@@ -1,6 +1,7 @@
 package org
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -188,13 +189,16 @@ func isSpecialRow(rawColumns []string) bool {
 func (s *Table) GetRealRowCol(row, col int) (int, int) {
 	specialCount := 0
 	for i, r := range s.Rows {
-		if r.IsSpecial {
+		fmt.Printf("BB: %d==%d\n", (i + 1), (row + specialCount))
+		if r.IsSpecial == true {
 			specialCount += 1
 		}
+		fmt.Printf("VV: %d==%d\n", (i + 1), (row + specialCount))
 		if (i + 1) == (row + specialCount) {
 			return i, (col - 1)
 		}
 	}
+	fmt.Printf("NO MATCH\n")
 	return -1, -1
 }
 
