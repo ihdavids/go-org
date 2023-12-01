@@ -188,11 +188,11 @@ func isSpecialRow(rawColumns []string) bool {
 func (s *Table) GetRealRowCol(row, col int) (int, int) {
 	specialCount := 0
 	for i, r := range s.Rows {
-		if (i + 1) == row+specialCount {
-			return i, (col - 1)
-		}
 		if r.IsSpecial {
 			specialCount += 1
+		}
+		if (i + 1) == row+specialCount {
+			return i, (col - 1)
 		}
 	}
 	return -1, -1
