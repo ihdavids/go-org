@@ -185,6 +185,52 @@ func isSpecialRow(rawColumns []string) bool {
 	return isAlignRow
 }
 
+func (s *Table) GetRealRowCol(row, col int) (int, int) {
+	specialCount := 0
+	for i, r := range s.Rows {
+		if (i + 1) == row+specialCount {
+			return i, (col - 1)
+		}
+		if r.IsSpecial {
+			specialCount += 1
+		}
+	}
+	return -1, -1
+}
+
+func (s *Table) SetVal(row, col int, val string) {
+	if s == nil {
+		return
+	}
+	row, col = s.GetRealRowCol(row, col)
+	if col >= 0 && row >= 0 && row < len(s.Rows) {
+		if col < len(s.Rows[row].Columns) {
+			s.Rows[row].Columns[col].Children = []Node{Text{Content: val}}
+		}
+	}
+}
+
+func (s *Table) SetValRef(r *RowColRef, v string) {
+	if s == nil {
+		return
+	}
+	s.SetVal(r.Row, r.Col, v)
+}
+
+func (s *Table) GetVal(row, col int) string {
+	if s == nil {
+		return ""
+	}
+	row, col = s.GetRealRowCol(row, col)
+	if col >= 0 && row >= 0 && row < len(s.Rows) {
+		if col < len(s.Rows[row].Columns) {
+			w := OrgWriter{}
+			return w.WriteNodesAsString(s.Rows[row].Columns[col].Children...)
+		}
+	}
+	return ""
+}
+
 //////////////////// FORMULA MANAGEMENT //////////////////////////////////////////////
 
 type Formula struct {
