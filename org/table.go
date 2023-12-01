@@ -1,7 +1,6 @@
 package org
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -186,19 +185,25 @@ func isSpecialRow(rawColumns []string) bool {
 	return isAlignRow
 }
 
+func (s *Table) IsSeparatorRow(row int) bool {
+	for _, v := range s.SeparatorIndices {
+		if v == row {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Table) GetRealRowCol(row, col int) (int, int) {
 	specialCount := 0
-	for i, r := range s.Rows {
-		fmt.Printf("BB: %d==%d\n", (i + 1), (row + specialCount))
-		if r.IsSpecial == true {
+	for i, _ := range s.Rows {
+		if s.IsSeparatorRow(i) {
 			specialCount += 1
 		}
-		fmt.Printf("VV: %d==%d\n", (i + 1), (row + specialCount))
 		if (i + 1) == (row + specialCount) {
 			return i, (col - 1)
 		}
 	}
-	fmt.Printf("NO MATCH\n")
 	return -1, -1
 }
 
