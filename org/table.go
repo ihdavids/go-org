@@ -1,6 +1,8 @@
 package org
 
 import (
+	"bytes"
+	"errors"
 	"regexp"
 	"strconv"
 	"strings"
@@ -17,6 +19,7 @@ type Table struct {
 	SeparatorIndices []int
 	Pos              Pos
 	Formulas         *Formulas
+	Cur              RowColRef
 }
 
 type Row struct {
@@ -87,7 +90,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil}
+	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false}}
 	var starts []Pos
 	var ends []Pos
 	for r, rawColumns := range rawRows {
@@ -240,6 +243,51 @@ func (s *Table) GetVal(row, col int) string {
 	return ""
 }
 
+func (s *Table) GetValRef(r *RowColRef) string {
+	return s.GetVal(r.Row, r.Col)
+}
+
+func (s *Table) GetWidth() int {
+	if s == nil {
+		return 0
+	}
+	return len(s.Rows)
+}
+
+func (s *Table) GetHeight() int {
+	w := s.GetWidth()
+	if w > 0 {
+		return len(s.Rows[0].Columns)
+	}
+	return 0
+}
+
+func ClampToMinMax(sr int, max int) int {
+	if sr <= 0 {
+		return 1
+	}
+	if sr > max {
+		return max
+	}
+	return sr
+}
+
+func (s *Table) ClampRow(r int) int {
+	return ClampToMinMax(r, s.GetWidth())
+}
+
+func (s *Table) ClampCol(r int) int {
+	return ClampToMinMax(r, s.GetHeight())
+}
+
+func (s *Table) CurrentRow() int {
+	return s.Cur.Row
+}
+
+func (s *Table) CurrentCol() int {
+	return s.Cur.Col
+}
+
 //////////////////// FORMULA MANAGEMENT //////////////////////////////////////////////
 
 type Formula struct {
@@ -252,8 +300,9 @@ type Formula struct {
 }
 
 type RowColRef struct {
-	Row int
-	Col int
+	Row      int
+	Col      int
+	Relative bool
 }
 
 type FormulaTarget struct {
@@ -271,32 +320,196 @@ func (s *Formulas) AppendKeyword(k *Keyword) {
 // Tricky nesting here, watch out for indexs
 var tableTargetRe = regexp.MustCompile(`\s*(([@](?P<rowonly>[-]?[0-9><]+))|([$](?P<colonly>[-]?[0-9><]+))|([@](?P<row>[-]?[0-9><]+)[$](?P<col>[-]?[0-9><]+)))\s*$`)
 
-func MakeRowColDef(s string) RowColRef {
+// numeral describes the value and symbol of a single roman numeral
+type numeral struct {
+	val int
+	sym []byte
+}
+
+var (
+	// InvalidRomanNumeral - error for when a roman numeral string provided is not a valid roman numeral
+	InvalidRomanNumeral = errors.New("invalid roman numeral")
+	// IntegerOutOfBounds - error for when the integer provided is invalid and unable to be converted to a roman numeral
+	IntegerOutOfBounds = errors.New("integer must be between 1 and 3999")
+
+	// all unique numerals ordered from largest to smallest
+	nums = []numeral{
+		{1000, []byte("M")},
+		{900, []byte("CM")},
+		{500, []byte("D")},
+		{400, []byte("CD")},
+		{100, []byte("C")},
+		{90, []byte("XC")},
+		{50, []byte("L")},
+		{40, []byte("XL")},
+		{10, []byte("X")},
+		{9, []byte("IX")},
+		{5, []byte("V")},
+		{4, []byte("IV")},
+		{1, []byte("I")},
+	}
+
+	// lookup arrays used for converting from an int to a roman numeral extremely quickly.
+	// method from here: https://rosettacode.org/wiki/Roman_numerals/Encode#Go
+	r0 = []string{"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"}
+	r1 = []string{"", "X", "XX", "XXX", "XL", "L", "LX", "LXX", "LXXX", "XC"}
+	r2 = []string{"", "C", "CC", "CCC", "CD", "D", "DC", "DCC", "DCCC", "CM"}
+	r3 = []string{"", "M", "MM", "MMM"}
+)
+
+// IntToString converts an integer value to a roman numeral string. An error is
+// returned if the integer is not between 1 and 3999.
+func RomanIntToString(input int) (string, error) {
+	if romanOutOfBounds(input) {
+		return "", IntegerOutOfBounds
+	}
+	return romanIntToRoman(input), nil
+}
+
+// IntToBytes converts an integer value to a roman numeral byte array. An error is
+// returned if the integer is not between 1 and 3999.
+func RomanIntToBytes(input int) ([]byte, error) {
+	str, err := RomanIntToString(input)
+	return []byte(str), err
+}
+
+// outOfBounds checks to ensure an input value is valid for roman numerals without the need of
+// vinculum (used for values of 4,000 and greater)
+func romanOutOfBounds(input int) bool {
+	return input < 1 || input > 3999
+}
+
+func romanIntToRoman(n int) string {
+	// This is efficient in Go. The 4 operands are evaluated,
+	// then a single allocation is made of the exact size needed for the result.
+	return r3[n%1e4/1e3] + r2[n%1e3/1e2] + r1[n%100/10] + r0[n%10]
+}
+
+// StringToInt converts a roman numeral string to an integer. Roman numerals for numbers
+// outside of the range 1 to 3,999 will return an error. Empty strings will return 0
+// with no error thrown.
+func RomanStringToInt(input string) (int, error) {
+	return RomanBytesToInt([]byte(input))
+}
+
+// BytesToInt converts a roman numeral byte array to an integer. Roman numerals for numbers
+// outside of the range 1 to 3,999 will return an error. Nil or empty []byte will return 0
+// with no error thrown.
+func RomanBytesToInt(input []byte) (int, error) {
+	if input == nil || len(input) == 0 {
+		return 0, nil
+	}
+	if output, ok := romanToInt(input); ok {
+		return output, nil
+	}
+	return 0, InvalidRomanNumeral
+}
+
+func romanToInt(input []byte) (int, bool) {
+	var output int
+	for _, n := range nums {
+		for bytes.HasPrefix(input, n.sym) {
+			output += n.val
+			input = input[len(n.sym):]
+		}
+	}
+	// if we are still left with input string values then the
+	// input was invalid and the bool is returned as false
+	return output, len(input) == 0
+}
+
+func ConvertRomanNumeral(v string) int {
+	if r, e := RomanStringToInt(v); e == nil {
+		return r
+	}
+	return 1
+}
+
+func GetRow(v string, tbl *Table) (int, bool) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 1, false
+	} else if v[0] == '<' {
+		return tbl.ClampRow(len(v)), false
+	} else if v[0] == '>' {
+		return tbl.ClampRow(tbl.GetWidth() - len(v)), false
+	} else if v[0] == 'I' || v[0] == 'V' || v[0] == 'X' {
+		r := ConvertRomanNumeral(v)
+		if r >= 1 && r <= len(tbl.SeparatorIndices) {
+			r -= 1
+			return tbl.ClampRow(tbl.SeparatorIndices[r]), false
+		}
+	}
+	if r, err := strconv.Atoi(v); err == nil {
+		rel := false
+		if r <= 0 {
+			rel = true
+			r = tbl.CurrentRow() + r
+			if r == 0 {
+				r = 1
+			}
+		}
+		return r, rel
+	}
+	return 1, false
+}
+
+func GetCol(v string, tbl *Table) (int, bool) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 1, false
+	}
+	if v[0] == '<' {
+		return tbl.ClampCol(len(v)), false
+	}
+	if v[0] == '>' {
+		return tbl.ClampCol(tbl.GetHeight() - len(v)), false
+	}
+	if r, err := strconv.Atoi(v); err == nil {
+		rel := false
+		if r <= 0 {
+			rel = true
+			r = tbl.CurrentCol() + r
+			if r == 0 {
+				r = 1
+			}
+		}
+		return r, rel
+	}
+	return 1, false
+}
+
+func MakeRowColDef(s string, tbl *Table) RowColRef {
 	r := RowColRef{}
+	rel := false
 	if m := tableTargetRe.FindStringSubmatch(s); m != nil {
 		if m[3] != "" {
-			r.Row, _ = strconv.Atoi(m[3])
+			r.Row, rel = GetRow(m[3], tbl)
 			r.Col = -1
+			r.Relative = rel
 		} else if m[5] != "" {
 			r.Row = -1
-			r.Col, _ = strconv.Atoi(m[5])
+			r.Col, rel = GetCol(m[5], tbl)
+			r.Relative = rel
 		} else {
-			r.Row, _ = strconv.Atoi(m[7])
-			r.Col, _ = strconv.Atoi(m[8])
+			relc := false
+			r.Row, rel = GetRow(m[7], tbl)
+			r.Col, relc = GetCol(m[8], tbl)
+			r.Relative = rel || relc
 		}
 	}
 	return r
 }
 
-func (s *FormulaTarget) Process() {
+func (s *FormulaTarget) Process(tbl *Table) {
 	if s.Raw != "" {
 		temp := strings.Split(s.Raw, "..")
 		if len(temp) == 1 {
-			s.Start = MakeRowColDef(temp[0])
+			s.Start = MakeRowColDef(temp[0], tbl)
 			s.End = s.Start
 		} else {
-			s.Start = MakeRowColDef(temp[0])
-			s.End = MakeRowColDef(temp[1])
+			s.Start = MakeRowColDef(temp[0], tbl)
+			s.End = MakeRowColDef(temp[1], tbl)
 		}
 	}
 }
@@ -351,16 +564,6 @@ func CreateNegIterator(rs, re int) func() int {
 	}
 }
 
-func ClampToMinMax(sr int, max int) int {
-	if sr <= 0 {
-		return 1
-	}
-	if sr > max {
-		return max
-	}
-	return sr
-}
-
 // This bugbear returns an iterator that can iterate over a range given a table.
 func (s *FormulaTarget) CreateIterator(tbl *Table) func() *RowColRef {
 	if tbl == nil {
@@ -369,11 +572,8 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) func() *RowColRef {
 		}
 	}
 	cur := &RowColRef{Row: s.Start.Row, Col: s.End.Col}
-	maxRows := len(tbl.Rows)
-	maxCols := 0
-	if maxRows > 0 {
-		maxCols = len(tbl.Rows[0].Columns)
-	}
+	maxRows := tbl.GetWidth()
+	maxCols := tbl.GetHeight()
 	if s.IsColRange() {
 		if s.IsPositiveRange() {
 			sv := ClampToMinMax(s.Start.Row, maxRows)
@@ -476,17 +676,17 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) func() *RowColRef {
 	}
 }
 
-func (s *Formula) Process() {
+func (s *Formula) Process(tbl *Table) {
 	tempStr := strings.Split(s.FormulaStr, "=")
 	if len(tempStr) == 2 {
 		s.Valid = true
 		s.Target = &FormulaTarget{Raw: strings.TrimSpace(tempStr[0])}
-		s.Target.Process()
+		s.Target.Process(tbl)
 		s.Expr = tempStr[1]
 	}
 }
 
-func (s *Formulas) Process() {
+func (s *Formulas) Process(tbl *Table) {
 	if len(s.Formulas) > 0 {
 		return
 	}
@@ -498,7 +698,7 @@ func (s *Formulas) Process() {
 			f = strings.TrimSpace(f)
 			if f != "" {
 				frm := &Formula{FormulaStr: f, Keyword: k, SubKeywordIndex: i}
-				frm.Process()
+				frm.Process(tbl)
 				frms = append(frms, frm)
 			}
 		}
