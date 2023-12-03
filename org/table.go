@@ -578,37 +578,8 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 	maxCols := tbl.GetHeight()
 	if s.IsColRange() {
 		if s.IsPositiveRange() {
-			sv := ClampToMinMax(s.Start.Row, maxRows)
-			if !s.IsEntireCol() {
-				maxRows = ClampToMinMax(s.End.Row, maxRows)
-			}
-			it := CreatePosIterator(sv, maxRows)
-			return func() *RowColRef {
-				cur.Row = it()
-				if cur.Row == -1 {
-					return nil
-				}
-				return cur
-			}
-		} else {
-			minRows := 1
-			sv := ClampToMinMax(s.Start.Row, maxRows)
-			if !s.IsEntireCol() {
-				minRows = ClampToMinMax(s.End.Row, maxRows)
-			}
-			it := CreateNegIterator(sv, minRows)
-			return func() *RowColRef {
-				cur.Row = it()
-				if cur.Row == -1 {
-					return nil
-				}
-				return cur
-			}
-		}
-	} else if s.IsRowRange() {
-		if s.IsPositiveRange() {
 			sv := ClampToMinMax(s.Start.Col, maxCols)
-			if !s.IsEntireRow() {
+			if !s.IsEntireCol() {
 				maxCols = ClampToMinMax(s.End.Col, maxCols)
 			}
 			it := CreatePosIterator(sv, maxCols)
@@ -622,13 +593,42 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 		} else {
 			minCols := 1
 			sv := ClampToMinMax(s.Start.Col, maxCols)
-			if !s.IsEntireRow() {
+			if !s.IsEntireCol() {
 				minCols = ClampToMinMax(s.End.Col, maxCols)
 			}
 			it := CreateNegIterator(sv, minCols)
 			return func() *RowColRef {
 				cur.Col = it()
 				if cur.Col == -1 {
+					return nil
+				}
+				return cur
+			}
+		}
+	} else if s.IsRowRange() {
+		if s.IsPositiveRange() {
+			sv := ClampToMinMax(s.Start.Row, maxRows)
+			if !s.IsEntireRow() {
+				maxRows = ClampToMinMax(s.End.Row, maxRows)
+			}
+			it := CreatePosIterator(sv, maxRows)
+			return func() *RowColRef {
+				cur.Row = it()
+				if cur.Row == -1 {
+					return nil
+				}
+				return cur
+			}
+		} else {
+			minRows := 1
+			sv := ClampToMinMax(s.Start.Row, maxRows)
+			if !s.IsEntireRow() {
+				minRows = ClampToMinMax(s.End.Row, maxRows)
+			}
+			it := CreateNegIterator(sv, minRows)
+			return func() *RowColRef {
+				cur.Row = it()
+				if cur.Row == -1 {
 					return nil
 				}
 				return cur
