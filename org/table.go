@@ -564,8 +564,10 @@ func CreateNegIterator(rs, re int) func() int {
 	}
 }
 
+type ColRefIterator func() *RowColRef
+
 // This bugbear returns an iterator that can iterate over a range given a table.
-func (s *FormulaTarget) CreateIterator(tbl *Table) func() *RowColRef {
+func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 	if tbl == nil {
 		return func() *RowColRef {
 			return nil
