@@ -432,7 +432,7 @@ func GetRow(v string, tbl *Table) (int, bool) {
 	} else if v[0] == '<' {
 		return tbl.ClampRow(len(v)), false
 	} else if v[0] == '>' {
-		return tbl.ClampRow(tbl.GetWidth() - len(v)), false
+		return tbl.ClampRow(tbl.GetHeight() - len(tbl.SeparatorIndices) - (len(v) - 1)), false
 	} else if v[0] == 'I' || v[0] == 'V' || v[0] == 'X' {
 		r := ConvertRomanNumeral(v)
 		if r >= 1 && r <= len(tbl.SeparatorIndices) {
@@ -463,7 +463,7 @@ func GetCol(v string, tbl *Table) (int, bool) {
 		return tbl.ClampCol(len(v)), false
 	}
 	if v[0] == '>' {
-		return tbl.ClampCol(tbl.GetHeight() - len(v)), false
+		return tbl.ClampCol(tbl.GetHeight() - (len(v) - 1)), false
 	}
 	if r, err := strconv.Atoi(v); err == nil {
 		rel := false
