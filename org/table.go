@@ -514,12 +514,14 @@ func (s *FormulaTarget) Process(tbl *Table) {
 	}
 }
 
+// Change in row
 func (s *FormulaTarget) IsRowRange() bool {
-	return s.IsEntireRow() || (s.Start.Row != s.End.Row && s.Start.Col == s.End.Col)
+	return s.IsEntireCol() || (s.Start.Row != s.End.Row && s.Start.Col == s.End.Col)
 }
 
+// Change in col
 func (s *FormulaTarget) IsColRange() bool {
-	return s.IsEntireCol() || (s.Start.Row == s.End.Row && s.Start.Col != s.End.Col)
+	return s.IsEntireRow() || (s.Start.Row == s.End.Row && s.Start.Col != s.End.Col)
 }
 
 func (s *FormulaTarget) IsEntireRow() bool {
@@ -576,10 +578,11 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 	cur := &RowColRef{Row: s.Start.Row, Col: s.End.Col}
 	maxRows := tbl.GetWidth()
 	maxCols := tbl.GetHeight()
+	// Change in col (IE along a row)
 	if s.IsColRange() {
 		if s.IsPositiveRange() {
 			sv := ClampToMinMax(s.Start.Col, maxCols)
-			if !s.IsEntireCol() {
+			if !s.IsEntireRow() {
 				maxCols = ClampToMinMax(s.End.Col, maxCols)
 			}
 			it := CreatePosIterator(sv, maxCols)
@@ -593,7 +596,7 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 		} else {
 			minCols := 1
 			sv := ClampToMinMax(s.Start.Col, maxCols)
-			if !s.IsEntireCol() {
+			if !s.IsEntireRow() {
 				minCols = ClampToMinMax(s.End.Col, maxCols)
 			}
 			it := CreateNegIterator(sv, minCols)
@@ -608,7 +611,7 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 	} else if s.IsRowRange() {
 		if s.IsPositiveRange() {
 			sv := ClampToMinMax(s.Start.Row, maxRows)
-			if !s.IsEntireRow() {
+			if !s.IsEntireCol() {
 				maxRows = ClampToMinMax(s.End.Row, maxRows)
 			}
 			it := CreatePosIterator(sv, maxRows)
@@ -622,7 +625,7 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 		} else {
 			minRows := 1
 			sv := ClampToMinMax(s.Start.Row, maxRows)
-			if !s.IsEntireRow() {
+			if !s.IsEntireCol() {
 				minRows = ClampToMinMax(s.End.Row, maxRows)
 			}
 			it := CreateNegIterator(sv, minRows)
