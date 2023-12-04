@@ -248,18 +248,18 @@ func (s *Table) GetValRef(r *RowColRef) string {
 }
 
 func (s *Table) GetWidth() int {
+	h := s.GetHeight()
+	if h > 0 {
+		return len(s.Rows[0].Columns)
+	}
+	return 0
+}
+
+func (s *Table) GetHeight() int {
 	if s == nil {
 		return 0
 	}
 	return len(s.Rows)
-}
-
-func (s *Table) GetHeight() int {
-	w := s.GetWidth()
-	if w > 0 {
-		return len(s.Rows[0].Columns)
-	}
-	return 0
 }
 
 func ClampToMinMax(sr int, max int) int {
