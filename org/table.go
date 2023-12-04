@@ -576,8 +576,8 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 		}
 	}
 	cur := &RowColRef{Row: s.Start.Row, Col: s.End.Col}
-	maxRows := tbl.GetWidth()
-	maxCols := tbl.GetHeight()
+	maxRows := tbl.GetHeight()
+	maxCols := tbl.GetWidth()
 	// Change in col (IE along a row)
 	if s.IsColRange() {
 		if s.IsPositiveRange() {
