@@ -273,11 +273,11 @@ func ClampToMinMax(sr int, max int) int {
 }
 
 func (s *Table) ClampRow(r int) int {
-	return ClampToMinMax(r, s.GetWidth())
+	return ClampToMinMax(r, s.GetHeight())
 }
 
 func (s *Table) ClampCol(r int) int {
-	return ClampToMinMax(r, s.GetHeight())
+	return ClampToMinMax(r, s.GetWidth())
 }
 
 func (s *Table) CurrentRow() int {
