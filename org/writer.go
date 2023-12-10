@@ -68,6 +68,8 @@ func WriteNodesLB(offset int, w Writer, nodes ...Node) {
 			w.WriteNodeWithMeta(n)
 		case NodeWithName:
 			w.WriteNodeWithName(n)
+		case *NodeWithName:
+			w.WriteNodeWithName(*n)
 		case Headline:
 			w.WriteHeadline(n)
 		case *Headline:

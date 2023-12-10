@@ -131,7 +131,7 @@ func (d *Document) parseNodeWithName(k Keyword, i int, stop stopFn) (int, Node) 
 		return 0, nil
 	}
 	d.NamedNodes[k.Value] = node
-	return consumed + 1, NodeWithName{k.Value, node}
+	return consumed + 1, &NodeWithName{k.Value, node}
 }
 
 func (d *Document) parseAffiliated(i int, stop stopFn) (int, Node) {
@@ -260,3 +260,5 @@ func (n Keyword) GetChildren() []Node      { return nil }
 func (n NodeWithMeta) GetChildren() []Node { return nil }
 func (n NodeWithName) GetChildren() []Node { return nil }
 func (n Include) GetChildren() []Node      { return nil }
+
+func (n NodeWithName) IsTable() bool { return n.GetType() == TableNode }
