@@ -296,6 +296,7 @@ type Formula struct {
 	SubKeywordIndex int
 	Target          *FormulaTarget
 	Expr            string
+	Format          string
 	Valid           bool
 }
 
@@ -719,7 +720,14 @@ func (s *Formula) Process(tbl *Table) {
 		s.Valid = true
 		s.Target = &FormulaTarget{Raw: strings.TrimSpace(tempStr[0])}
 		s.Target.Process(tbl)
-		s.Expr = tempStr[1]
+		formStrs := strings.Split(tempStr[1], ";")
+		if len(formStrs) > 1 {
+			s.Expr = formStrs[0]
+			s.Format = formStrs[1]
+		} else {
+			s.Expr = formStrs[0]
+			s.Format = ""
+		}
 	}
 }
 
