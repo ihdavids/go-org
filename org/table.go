@@ -514,6 +514,38 @@ func (s *FormulaTarget) Process(tbl *Table) {
 	}
 }
 
+func MakeRowColDefParsed(rin, cin string, tbl *Table) RowColRef {
+	r := RowColRef{}
+	rel := false
+	if rin != "" && cin == "" {
+		r.Row, rel = GetRow(rin, tbl)
+		r.Col = -1
+		r.Relative = rel
+	} else if cin != "" && rin == "" {
+		r.Row = -1
+		r.Col, rel = GetCol(cin, tbl)
+		r.Relative = rel
+	} else {
+		relc := false
+		r.Row, rel = GetRow(rin, tbl)
+		r.Col, relc = GetCol(cin, tbl)
+		r.Relative = rel || relc
+	}
+	return r
+}
+
+func MakeFormulaTarget(r1, c1, r2, c2 string, tbl *Table) *FormulaTarget {
+	s := &FormulaTarget{}
+	if r2 == "" && c2 == "" {
+		s.Start = MakeRowColDefParsed(r1, c1, tbl)
+		s.End = s.Start
+	} else {
+		s.Start = MakeRowColDefParsed(r1, c1, tbl)
+		s.End = MakeRowColDefParsed(r2, c2, tbl)
+	}
+	return s
+}
+
 // Change in row
 func (s *FormulaTarget) IsRowRange() bool {
 	return s.IsEntireCol() || (s.Start.Row != s.End.Row && s.Start.Col == s.End.Col)
