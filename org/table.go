@@ -715,17 +715,17 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 }
 
 func (s *Formula) Process(tbl *Table) {
-	tempStr := strings.Split(s.FormulaStr, "=")
-	if len(tempStr) == 2 {
+	// Do we need to validate the formula?
+	if tgt, expr, found := strings.Cut(s.FormulaStr, "="); found {
 		s.Valid = true
-		s.Target = &FormulaTarget{Raw: strings.TrimSpace(tempStr[0])}
+		s.Target = &FormulaTarget{Raw: strings.TrimSpace(tgt)}
 		s.Target.Process(tbl)
-		formStrs := strings.Split(tempStr[1], ";")
-		if len(formStrs) > 1 {
-			s.Expr = formStrs[0]
-			s.Format = formStrs[1]
+		// This might not be good enough! May need to be smarter than this.
+		if frmt := strings.LastIndex(expr, ";"); frmt != -1 {
+			s.Expr = expr[:frmt]
+			s.Format = expr[frmt+1:]
 		} else {
-			s.Expr = formStrs[0]
+			s.Expr = expr
 			s.Format = ""
 		}
 	}
