@@ -288,6 +288,21 @@ func (s *Table) CurrentCol() int {
 	return s.Cur.Col
 }
 
+func (s *Table) RecomputeColumnInfos() {
+	w := OrgWriter{}
+	for r := 0; r < len(s.Rows); r++ {
+		row := s.Rows[r]
+		for c := 0; c < len(row.Columns); c++ {
+			col := row.Columns[c]
+			v := w.WriteNodesAsString(col.Children...)
+			l := utf8.RuneCountInString(v)
+			if l > s.ColumnInfos[c].Len {
+				s.ColumnInfos[c].Len = l
+			}
+		}
+	}
+}
+
 //////////////////// FORMULA MANAGEMENT //////////////////////////////////////////////
 
 type Formula struct {
