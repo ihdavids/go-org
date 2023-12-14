@@ -460,10 +460,7 @@ func GetRow(v string, tbl *Table) (int, bool) {
 		rel := false
 		if r <= 0 {
 			rel = true
-			r = tbl.CurrentRow() + r
-			if r == 0 {
-				r = 1
-			}
+			r = -1
 		}
 		return r, rel
 	}
@@ -485,10 +482,7 @@ func GetCol(v string, tbl *Table) (int, bool) {
 		rel := false
 		if r <= 0 {
 			rel = true
-			r = tbl.CurrentCol() + r
-			if r == 0 {
-				r = 1
-			}
+			r = -1
 		}
 		return r, rel
 	}
