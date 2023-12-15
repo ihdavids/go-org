@@ -469,7 +469,7 @@ func GetRow(v string, tbl *Table) (int, bool) {
 		rel := false
 		if r <= 0 {
 			rel = true
-			r = -1
+			r = -r
 		}
 		return r, rel
 	}
@@ -491,7 +491,7 @@ func GetCol(v string, tbl *Table) (int, bool) {
 		rel := false
 		if r <= 0 {
 			rel = true
-			r = -1
+			r = -r
 		}
 		return r, rel
 	}
