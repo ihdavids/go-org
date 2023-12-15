@@ -244,7 +244,15 @@ func (s *Table) GetVal(row, col int) string {
 }
 
 func (s *Table) GetValRef(r *RowColRef) string {
-	return s.GetVal(r.Row, r.Col)
+	row := r.Row
+	col := r.Col
+	if r.RelativeRow {
+		row = s.Cur.Row - row
+	}
+	if r.RelativeCol {
+		col = s.Cur.Col - col
+	}
+	return s.GetVal(row, col)
 }
 
 func (s *Table) GetWidth() int {
