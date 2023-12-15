@@ -90,7 +90,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false}}
+	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false, false}}
 	var starts []Pos
 	var ends []Pos
 	for r, rawColumns := range rawRows {
@@ -316,9 +316,10 @@ type Formula struct {
 }
 
 type RowColRef struct {
-	Row      int
-	Col      int
-	Relative bool
+	Row         int
+	Col         int
+	RelativeCol bool
+	RelativeRow bool
 }
 
 type FormulaTarget struct {
@@ -496,16 +497,17 @@ func MakeRowColDef(s string, tbl *Table) RowColRef {
 		if m[3] != "" {
 			r.Row, rel = GetRow(m[3], tbl)
 			r.Col = -1
-			r.Relative = rel
+			r.RelativeRow = rel
 		} else if m[5] != "" {
 			r.Row = -1
 			r.Col, rel = GetCol(m[5], tbl)
-			r.Relative = rel
+			r.RelativeCol = rel
 		} else {
 			relc := false
 			r.Row, rel = GetRow(m[7], tbl)
 			r.Col, relc = GetCol(m[8], tbl)
-			r.Relative = rel || relc
+			r.RelativeCol = relc
+			r.RelativeRow = rel
 		}
 	}
 	return r
@@ -530,16 +532,17 @@ func MakeRowColDefParsed(rin, cin string, tbl *Table) RowColRef {
 	if rin != "" && cin == "" {
 		r.Row, rel = GetRow(rin, tbl)
 		r.Col = -1
-		r.Relative = rel
+		r.RelativeRow = rel
 	} else if cin != "" && rin == "" {
 		r.Row = -1
 		r.Col, rel = GetCol(cin, tbl)
-		r.Relative = rel
+		r.RelativeCol = rel
 	} else {
 		relc := false
 		r.Row, rel = GetRow(rin, tbl)
 		r.Col, relc = GetCol(cin, tbl)
-		r.Relative = rel || relc
+		r.RelativeRow = rel
+		r.RelativeCol = relc
 	}
 	return r
 }
@@ -557,29 +560,29 @@ func MakeFormulaTarget(r1, c1, r2, c2 string, tbl *Table) *FormulaTarget {
 }
 
 // Change in row
-func (s *FormulaTarget) IsRowRange() bool {
-	return s.IsEntireCol() || (s.Start.Row != s.End.Row && s.Start.Col == s.End.Col)
+func IsRowRange(s, e *RowColRef) bool {
+	return s.IsEntireCol() || (s.Row != e.Row && s.Col == e.Col)
 }
 
 // Change in col
-func (s *FormulaTarget) IsColRange() bool {
-	return s.IsEntireRow() || (s.Start.Row == s.End.Row && s.Start.Col != s.End.Col)
+func IsColRange(s, e *RowColRef) bool {
+	return s.IsEntireRow() || (s.Row == e.Row && s.Col != e.Col)
 }
 
-func (s *FormulaTarget) IsEntireRow() bool {
-	return s.Start.Col == -1
+func (s *RowColRef) IsEntireRow() bool {
+	return s.Col == -1
 }
 
-func (s *FormulaTarget) IsEntireCol() bool {
-	return s.Start.Row == -1
+func (s *RowColRef) IsEntireCol() bool {
+	return s.Row == -1
 }
 
-func (s *FormulaTarget) IsPositiveRange() bool {
-	if s.IsColRange() && !s.IsEntireCol() {
-		return s.Start.Col <= s.End.Col
+func IsPositiveRange(s, e *RowColRef) bool {
+	if IsColRange(s, e) && !s.IsEntireCol() {
+		return s.Col <= e.Col
 	}
-	if s.IsRowRange() && !s.IsEntireRow() {
-		return s.Start.Row <= s.End.Row
+	if IsRowRange(s, e) && !s.IsEntireRow() {
+		return s.Row <= e.Row
 	}
 	return true
 }
@@ -610,6 +613,17 @@ func CreateNegIterator(rs, re int) func() int {
 
 type ColRefIterator func() *RowColRef
 
+func FixupPos(tbl *Table, p *RowColRef) *RowColRef {
+	r := RowColRef{Row: p.Row, Col: p.Col, RelativeCol: p.RelativeCol, RelativeRow: p.RelativeRow}
+	if r.RelativeCol {
+		r.Col = ClampToMinMax(tbl.Cur.Col-r.Col, tbl.GetWidth())
+	}
+	if r.RelativeRow {
+		r.Row = ClampToMinMax(tbl.Cur.Row-r.Row, tbl.GetHeight())
+	}
+	return &r
+}
+
 // This bugbear returns an iterator that can iterate over a range given a table.
 func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 	if tbl == nil {
@@ -618,14 +632,17 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 		}
 	}
 	cur := &RowColRef{Row: s.Start.Row, Col: s.End.Col}
+	start := FixupPos(tbl, &s.Start)
+	end := FixupPos(tbl, &s.End)
+
 	maxRows := tbl.GetHeight()
 	maxCols := tbl.GetWidth()
 	// Change in col (IE along a row)
-	if s.IsColRange() {
-		if s.IsPositiveRange() {
-			sv := ClampToMinMax(s.Start.Col, maxCols)
-			if !s.IsEntireRow() {
-				maxCols = ClampToMinMax(s.End.Col, maxCols)
+	if IsColRange(start, end) {
+		if IsPositiveRange(start, end) {
+			sv := ClampToMinMax(start.Col, maxCols)
+			if !start.IsEntireRow() {
+				maxCols = ClampToMinMax(end.Col, maxCols)
 			}
 			it := CreatePosIterator(sv, maxCols)
 			return func() *RowColRef {
@@ -637,9 +654,9 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 			}
 		} else {
 			minCols := 1
-			sv := ClampToMinMax(s.Start.Col, maxCols)
-			if !s.IsEntireRow() {
-				minCols = ClampToMinMax(s.End.Col, maxCols)
+			sv := ClampToMinMax(start.Col, maxCols)
+			if !start.IsEntireRow() {
+				minCols = ClampToMinMax(end.Col, maxCols)
 			}
 			it := CreateNegIterator(sv, minCols)
 			return func() *RowColRef {
@@ -650,11 +667,11 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				return cur
 			}
 		}
-	} else if s.IsRowRange() {
-		if s.IsPositiveRange() {
-			sv := ClampToMinMax(s.Start.Row, maxRows)
-			if !s.IsEntireCol() {
-				maxRows = ClampToMinMax(s.End.Row, maxRows)
+	} else if IsRowRange(start, end) {
+		if IsPositiveRange(start, end) {
+			sv := ClampToMinMax(start.Row, maxRows)
+			if !start.IsEntireCol() {
+				maxRows = ClampToMinMax(end.Row, maxRows)
 			}
 			it := CreatePosIterator(sv, maxRows)
 			return func() *RowColRef {
@@ -666,9 +683,9 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 			}
 		} else {
 			minRows := 1
-			sv := ClampToMinMax(s.Start.Row, maxRows)
-			if !s.IsEntireCol() {
-				minRows = ClampToMinMax(s.End.Row, maxRows)
+			sv := ClampToMinMax(start.Row, maxRows)
+			if !start.IsEntireCol() {
+				minRows = ClampToMinMax(end.Row, maxRows)
 			}
 			it := CreateNegIterator(sv, minRows)
 			return func() *RowColRef {
@@ -680,11 +697,11 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 			}
 		}
 	} else {
-		if s.IsPositiveRange() {
-			sr := ClampToMinMax(s.Start.Row, maxRows)
-			sc := ClampToMinMax(s.Start.Col, maxCols)
-			er := ClampToMinMax(s.End.Row, maxRows)
-			ec := ClampToMinMax(s.End.Col, maxCols)
+		if IsPositiveRange(start, end) {
+			sr := ClampToMinMax(start.Row, maxRows)
+			sc := ClampToMinMax(start.Col, maxCols)
+			er := ClampToMinMax(end.Row, maxRows)
+			ec := ClampToMinMax(end.Col, maxCols)
 			rit := CreatePosIterator(sr, er)
 			cit := CreatePosIterator(sc, ec)
 			cur.Col = cit()
@@ -701,10 +718,10 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				return cur
 			}
 		} else {
-			sr := ClampToMinMax(s.Start.Row, maxRows)
-			sc := ClampToMinMax(s.Start.Col, maxCols)
-			er := ClampToMinMax(s.End.Row, maxRows)
-			ec := ClampToMinMax(s.End.Col, maxCols)
+			sr := ClampToMinMax(start.Row, maxRows)
+			sc := ClampToMinMax(start.Col, maxCols)
+			er := ClampToMinMax(end.Row, maxRows)
+			ec := ClampToMinMax(end.Col, maxCols)
 			rit := CreateNegIterator(sr, er)
 			cit := CreateNegIterator(sc, ec)
 			return func() *RowColRef {
