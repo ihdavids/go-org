@@ -258,7 +258,7 @@ func (n Include) GetTypeName() string      { return GetNodeTypeName(n.GetType())
 func (n Comment) GetChildren() []Node      { return nil }
 func (n Keyword) GetChildren() []Node      { return nil }
 func (n NodeWithMeta) GetChildren() []Node { return nil }
-func (n NodeWithName) GetChildren() []Node { return nil }
+func (n NodeWithName) GetChildren() []Node { return []Node{n.Node} }
 func (n Include) GetChildren() []Node      { return nil }
 
 func (n NodeWithName) IsTable() bool { return n.GetType() == TableNode }
