@@ -653,6 +653,9 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				maxCols = ClampToMinMax(end.Col, maxCols)
 			}
 			it := CreatePosIterator(sv, maxCols)
+			if cur.Row == -1 {
+				cur.Row = tbl.Cur.Row
+			}
 			return func() *RowColRef {
 				cur.Col = it()
 				if cur.Col == -1 {
@@ -667,6 +670,9 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				minCols = ClampToMinMax(end.Col, maxCols)
 			}
 			it := CreateNegIterator(sv, minCols)
+			if cur.Row == -1 {
+				cur.Row = tbl.Cur.Row
+			}
 			return func() *RowColRef {
 				cur.Col = it()
 				if cur.Col == -1 {
@@ -682,6 +688,9 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				maxRows = ClampToMinMax(end.Row, maxRows)
 			}
 			it := CreatePosIterator(sv, maxRows)
+			if cur.Col == -1 {
+				cur.Col = tbl.Cur.Col
+			}
 			return func() *RowColRef {
 				cur.Row = it()
 				if cur.Row == -1 {
@@ -696,6 +705,9 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				minRows = ClampToMinMax(end.Row, maxRows)
 			}
 			it := CreateNegIterator(sv, minRows)
+			if cur.Col == -1 {
+				cur.Col = tbl.Cur.Col
+			}
 			return func() *RowColRef {
 				cur.Row = it()
 				if cur.Row == -1 {
