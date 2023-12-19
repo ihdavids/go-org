@@ -20,11 +20,15 @@ type Table struct {
 	Pos              Pos
 	Formulas         *Formulas
 	Cur              RowColRef
+	ColNames         map[string]int
+	CellNames        map[string]RowColRef
+	Params           map[string]string
 }
 
 type Row struct {
-	Columns   []*Column
-	IsSpecial bool
+	Columns    []*Column
+	IsSpecial  bool
+	IsAdvanced string
 }
 
 type Column struct {
@@ -90,11 +94,11 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false, false}}
+	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false, false}, nil, nil, nil}
 	var starts []Pos
 	var ends []Pos
 	for r, rawColumns := range rawRows {
-		row := &Row{nil, isSpecialRow(rawColumns)}
+		row := &Row{nil, isSpecialRow(rawColumns), isAdvancedRow(rawColumns)}
 		if rowStartPositions[r] != nil {
 			starts = rowStartPositions[r]
 			ends = rowEndPositions[r]
@@ -127,6 +131,54 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	ch := d.currentHeadline.Get()
 	if ch != nil {
 		ch.Tables = append(ch.Tables, table)
+	}
+	for r, row := range table.Rows {
+		if row.IsAdvanced == "!" {
+			if table.ColNames == nil {
+				table.ColNames = make(map[string]int)
+			}
+			for c, _ := range row.Columns {
+				val := strings.TrimSpace(table.GetVal(r+1, c+1))
+				if val != "" {
+					table.ColNames[val] = c + 1
+				}
+			}
+		} else if row.IsAdvanced == "$" {
+			if table.Params == nil {
+				table.Params = make(map[string]string)
+			}
+			for c, _ := range row.Columns {
+				val := strings.TrimSpace(table.GetVal(r+1, c+1))
+				if val != "" {
+					if nm, val, have := strings.Cut(val, "="); have {
+						// TODO: Coerce this to a value of some kind
+						table.Params[nm] = val
+					}
+				}
+			}
+			// Name the cell above this row
+		} else if row.IsAdvanced == "^" && r != 0 { // NOTE: row 0 doesn't work, names do not get entered into table
+			if table.CellNames == nil {
+				table.CellNames = make(map[string]RowColRef)
+			}
+			for c, _ := range row.Columns {
+				val := strings.TrimSpace(table.GetVal(r+1, c+1))
+				if val != "" {
+					table.CellNames[val] = RowColRef{Row: r, Col: c + 1, RelativeRow: false, RelativeCol: false}
+				}
+			}
+			// Name the cell below this row
+		} else if row.IsAdvanced == "_" && r != (len(table.Rows)-1) {
+			if table.CellNames == nil {
+				table.CellNames = make(map[string]RowColRef)
+			}
+			for c, _ := range row.Columns {
+				val := strings.TrimSpace(table.GetVal(r+1, c+1))
+				if val != "" {
+					table.CellNames[val] = RowColRef{Row: r + 2, Col: c + 1, RelativeRow: false, RelativeCol: false}
+				}
+			}
+		}
 	}
 	return i - start, table
 }
@@ -186,6 +238,38 @@ func isSpecialRow(rawColumns []string) bool {
 		}
 	}
 	return isAlignRow
+}
+
+// ‘!’ The fields in this line define names for the columns, so that you may refer to a column as ‘$Tot’ instead of ‘$6’.
+// ‘^’ This row defines names for the fields above the row. With such a definition, any formula in the table may use ‘$m1’ to refer to the value ‘10’. Also, if you assign a formula to a names field, it is stored as ‘$name = ...’.
+// ‘_’ Similar to ‘^’, but defines names for the fields in the row below.
+// ‘$’ Fields in this row can define parameters for formulas. For example, if a field in a ‘$’ row contains ‘max=50’, then formulas in this table can refer to the value 50 using ‘$max’. Parameters work exactly like constants, only that they can be defined on a per-table basis.
+// ‘#’ Fields in this row are automatically recalculated when pressing TAB or RET or S-TAB in this row. Also, this row is selected for a global recalculation with C-u C-c *. Unmarked lines are left alone by this command.
+// ‘*’ Selects this line for global recalculation with C-u C-c *, but not for automatic recalculation. Use this when automatic recalculation slows down editing too much.
+// ‘/’ Row is skipped in export
+func isAdvancedRow(rawColumns []string) string {
+	if len(rawColumns) > 0 {
+		content := strings.TrimSpace(rawColumns[0])
+		if len(content) == 1 {
+			switch content[0] {
+			case '!':
+				fallthrough
+			case '^':
+				fallthrough
+			case '_':
+				fallthrough
+			case '$':
+				fallthrough
+			case '*':
+				fallthrough
+			case '/':
+				fallthrough
+			case '#':
+				return content
+			}
+		}
+	}
+	return ""
 }
 
 func (s *Table) IsSeparatorRow(row int) bool {
