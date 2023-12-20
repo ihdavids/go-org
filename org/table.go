@@ -157,12 +157,17 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	if ch != nil {
 		ch.Tables = append(ch.Tables, table)
 	}
+	off := 0
 	for r, row := range table.Rows {
+		if table.IsSeparatorRow(r) {
+			off += 1
+			continue
+		}
 		if row.IsAdvanced == "!" {
 			if table.ColNames == nil {
 				table.ColNames = make(map[string]int)
 			}
-			rowIdx, _ := table.GetRealRowCol(r+1, 0)
+			rowIdx, _ := table.GetRealRowCol(r+1-off, 0)
 			for c, _ := range row.Columns {
 				val := strings.TrimSpace(table.GetVal(rowIdx, c+1))
 				if val != "" {
@@ -173,7 +178,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 			if table.Params == nil {
 				table.Params = make(map[string]string)
 			}
-			rowIdx, _ := table.GetRealRowCol(r+1, 0)
+			rowIdx, _ := table.GetRealRowCol(r+1-off, 0)
 			for c, _ := range row.Columns {
 				val := strings.TrimSpace(table.GetVal(rowIdx, c+1))
 				if val != "" {
@@ -188,11 +193,11 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 			if table.CellNames == nil {
 				table.CellNames = make(map[string]RowColRef)
 			}
-			rowIdx, _ := table.GetRealRowCol(r+1, 0)
+			rowIdx, _ := table.GetRealRowCol(r+1-off, 0)
 			for c, _ := range row.Columns {
 				val := strings.TrimSpace(table.GetVal(rowIdx, c+1))
 				if val != "" {
-					rowIdxUp, _ := table.GetRealRowCol(r, 0)
+					rowIdxUp, _ := table.GetRealRowCol(r-off, 0)
 					table.CellNames[val] = RowColRef{Row: rowIdxUp, Col: c + 1, RelativeRow: false, RelativeCol: false}
 				}
 			}
@@ -201,11 +206,11 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 			if table.CellNames == nil {
 				table.CellNames = make(map[string]RowColRef)
 			}
-			rowIdx, _ := table.GetRealRowCol(r+1, 0)
+			rowIdx, _ := table.GetRealRowCol(r+1-off, 0)
 			for c, _ := range row.Columns {
 				val := strings.TrimSpace(table.GetVal(rowIdx, c+1))
 				if val != "" {
-					rowIdxDown, _ := table.GetRealRowCol(r+2, 0)
+					rowIdxDown, _ := table.GetRealRowCol(r+2-off, 0)
 					table.CellNames[val] = RowColRef{Row: rowIdxDown, Col: c + 1, RelativeRow: false, RelativeCol: false}
 				}
 			}
