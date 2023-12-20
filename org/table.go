@@ -3,6 +3,7 @@ package org
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -58,6 +59,30 @@ func lexTable(line string, row, col int) (token, bool) {
 		return token{"tableRow", len(m[1]), m[2], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
+}
+
+// Is this one of the advanced row types that we should skip.
+// names, parameters etc.
+func ShouldSkipAdvancedRow(adv string) bool {
+	return adv == "!" || adv == "^" || adv == "_" || adv == "$"
+}
+
+func ReplaceAllNamedColsAndCells(expr string, tbl *Table) string {
+	if tbl != nil && tbl.ColNames != nil {
+		for k, v := range tbl.ColNames {
+			re := regexp.MustCompile(fmt.Sprintf(`[$]%s\b`, k))
+			to := fmt.Sprintf(`$$%v`, v)
+			expr = re.ReplaceAllString(expr, to)
+		}
+	}
+	if tbl != nil && tbl.CellNames != nil {
+		for k, v := range tbl.CellNames {
+			re := regexp.MustCompile(fmt.Sprintf(`[$]%s\b`, k))
+			to := fmt.Sprintf("@%d$$%d", v.Row, v.Col)
+			expr = re.ReplaceAllString(expr, to)
+		}
+	}
+	return expr
 }
 
 func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
@@ -607,7 +632,8 @@ func MakeRowColDef(s string, tbl *Table) RowColRef {
 
 func (s *FormulaTarget) Process(tbl *Table) {
 	if s.Raw != "" {
-		temp := strings.Split(s.Raw, "..")
+		raw := ReplaceAllNamedColsAndCells(s.Raw, tbl)
+		temp := strings.Split(raw, "..")
 		if len(temp) == 1 {
 			s.Start = MakeRowColDef(temp[0], tbl)
 			s.End = s.Start
