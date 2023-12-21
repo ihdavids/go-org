@@ -50,11 +50,9 @@ var attributeRegexp = regexp.MustCompile(`(?:^|\s+)(:[-\w]+)\s+(.*)$`)
 
 func lexKeywordOrComment(line string, row, col int) (token, bool) {
 	if m := keywordRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
-		return token{"keyword", len(m[1]), m[0], m, pos, Pos{row, col + len(m[1])}}, true
+		return token{"keyword", len(m[1]), m[0], m, Pos{row, col + len(m[1])}, Pos{row, col + len(m[0])}}, true
 	} else if m := commentRegexp.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
-		return token{"comment", len(m[1]), m[2], m, pos, Pos{row, col + len(m[0])}}, true
+		return token{"comment", len(m[1]), m[2], m, Pos{row, col + len(m[1])}, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
 }
