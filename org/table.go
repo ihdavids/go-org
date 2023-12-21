@@ -441,6 +441,8 @@ type Formula struct {
 	Expr            string
 	Format          string
 	Valid           bool
+	Start           Pos
+	End             Pos
 }
 
 type RowColRef struct {
@@ -906,13 +908,17 @@ func (s *Formulas) Process(tbl *Table) {
 	frms := []*Formula{}
 	for _, k := range s.Keywords {
 		tempFormulas := strings.Split(k.Value, "::")
-		for i, f := range tempFormulas {
-			f = strings.TrimSpace(f)
+		startP := Pos{Row: k.Pos.Row, Col: k.Pos.Col + 8}
+		endP := startP
+		for i, fullForm := range tempFormulas {
+			f := strings.TrimSpace(fullForm)
+			endP = Pos{Row: startP.Row, Col: startP.Col + len(fullForm)}
 			if f != "" {
-				frm := &Formula{FormulaStr: f, Keyword: k, SubKeywordIndex: i}
+				frm := &Formula{FormulaStr: f, Keyword: k, SubKeywordIndex: i, Start: startP, End: endP}
 				frm.Process(tbl)
 				frms = append(frms, frm)
 			}
+			startP = endP
 		}
 	}
 	s.Formulas = frms
