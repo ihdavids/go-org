@@ -119,7 +119,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false, false}, nil, nil, nil}
+	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false, false, false, false}, nil, nil, nil}
 	var starts []Pos
 	var ends []Pos
 	for r, rawColumns := range rawRows {
@@ -367,10 +367,10 @@ func (s *Table) GetValRef(r *RowColRef) string {
 	row := r.Row
 	col := r.Col
 	if r.RelativeRow {
-		row = s.Cur.Row - row
+		row = s.Cur.Row + row
 	}
 	if r.RelativeCol {
-		col = s.Cur.Col - col
+		col = s.Cur.Col + col
 	}
 	return s.GetVal(row, col)
 }
@@ -450,6 +450,8 @@ type RowColRef struct {
 	Col         int
 	RelativeCol bool
 	RelativeRow bool
+	WildRow     bool
+	WildCol     bool
 }
 
 type FormulaTarget struct {
@@ -591,7 +593,10 @@ func GetRow(v string, tbl *Table) (int, bool) {
 		rel := false
 		if r <= 0 {
 			rel = true
-			r = -r
+		}
+		// Positive relative range
+		if strings.Contains(v, "+") {
+			rel = true
 		}
 		return r, rel
 	}
@@ -626,10 +631,12 @@ func MakeRowColDef(s string, tbl *Table) RowColRef {
 	if m := tableTargetRe.FindStringSubmatch(s); m != nil {
 		if m[3] != "" {
 			r.Row, rel = GetRow(m[3], tbl)
-			r.Col = -1
+			r.Col = 0
+			r.WildCol = true
 			r.RelativeRow = rel
 		} else if m[5] != "" {
-			r.Row = -1
+			r.Row = 0
+			r.WildRow = true
 			r.Col, rel = GetCol(m[5], tbl)
 			r.RelativeCol = rel
 		} else {
@@ -663,9 +670,11 @@ func MakeRowColDefParsed(rin, cin string, tbl *Table) RowColRef {
 	if rin != "" && cin == "" {
 		r.Row, rel = GetRow(rin, tbl)
 		r.Col = -1
+		r.WildCol = true
 		r.RelativeRow = rel
 	} else if cin != "" && rin == "" {
 		r.Row = -1
+		r.WildRow = true
 		r.Col, rel = GetCol(cin, tbl)
 		r.RelativeCol = rel
 	} else {
@@ -701,11 +710,11 @@ func IsColRange(s, e *RowColRef) bool {
 }
 
 func (s *RowColRef) IsEntireRow() bool {
-	return s.Col == -1
+	return s.WildCol
 }
 
 func (s *RowColRef) IsEntireCol() bool {
-	return s.Row == -1
+	return s.WildRow
 }
 
 func IsPositiveRange(s, e *RowColRef) bool {
@@ -747,10 +756,10 @@ type ColRefIterator func() *RowColRef
 func FixupPos(tbl *Table, p *RowColRef) *RowColRef {
 	r := RowColRef{Row: p.Row, Col: p.Col, RelativeCol: p.RelativeCol, RelativeRow: p.RelativeRow}
 	if r.RelativeCol {
-		r.Col = ClampToMinMax(tbl.Cur.Col-r.Col, tbl.GetWidth())
+		r.Col = ClampToMinMax(tbl.Cur.Col+r.Col, tbl.GetWidth())
 	}
 	if r.RelativeRow {
-		r.Row = ClampToMinMax(tbl.Cur.Row-r.Row, tbl.GetHeight())
+		r.Row = ClampToMinMax(tbl.Cur.Row+r.Row, tbl.GetHeight())
 	}
 	return &r
 }
@@ -776,7 +785,7 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				maxCols = ClampToMinMax(end.Col, maxCols)
 			}
 			it := CreatePosIterator(sv, maxCols)
-			if cur.Row == -1 {
+			if cur.WildRow {
 				cur.Row = tbl.Cur.Row
 			}
 			return func() *RowColRef {
@@ -793,7 +802,7 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				minCols = ClampToMinMax(end.Col, maxCols)
 			}
 			it := CreateNegIterator(sv, minCols)
-			if cur.Row == -1 {
+			if cur.WildRow {
 				cur.Row = tbl.Cur.Row
 			}
 			return func() *RowColRef {
@@ -811,7 +820,7 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				maxRows = ClampToMinMax(end.Row, maxRows)
 			}
 			it := CreatePosIterator(sv, maxRows)
-			if cur.Col == -1 {
+			if cur.WildCol {
 				cur.Col = tbl.Cur.Col
 			}
 			return func() *RowColRef {
@@ -828,7 +837,7 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 				minRows = ClampToMinMax(end.Row, maxRows)
 			}
 			it := CreateNegIterator(sv, minRows)
-			if cur.Col == -1 {
+			if cur.WildCol {
 				cur.Col = tbl.Cur.Col
 			}
 			return func() *RowColRef {
