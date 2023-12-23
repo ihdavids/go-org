@@ -774,7 +774,7 @@ func (s *FormulaTarget) CreateIterator(tbl *Table) ColRefIterator {
 			return nil
 		}
 	}
-	cur := &RowColRef{Row: s.Start.Row, Col: s.End.Col}
+	cur := &RowColRef{Row: s.Start.Row, Col: s.End.Col, RelativeCol: s.Start.RelativeCol, RelativeRow: s.Start.RelativeRow, WildCol: s.Start.WildCol, WildRow: s.Start.WildRow}
 	start := FixupPos(tbl, &s.Start)
 	end := FixupPos(tbl, &s.End)
 
