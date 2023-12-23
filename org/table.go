@@ -618,7 +618,10 @@ func GetCol(v string, tbl *Table) (int, bool) {
 		rel := false
 		if r <= 0 {
 			rel = true
-			r = -r
+		}
+		// Positive relative range
+		if strings.Contains(v, "+") {
+			rel = true
 		}
 		return r, rel
 	}
