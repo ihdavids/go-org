@@ -467,7 +467,7 @@ func (s *Formulas) AppendKeyword(k *Keyword) {
 }
 
 // Tricky nesting here, watch out for indexs
-var tableTargetRe = regexp.MustCompile(`\s*(([@](?P<rowonly>[-]?[0-9><]+))|([$](?P<colonly>[-]?[0-9><]+))|([@](?P<row>[-]?[0-9><]+)[$](?P<col>[-]?[0-9><]+)))\s*$`)
+var tableTargetRe = regexp.MustCompile(`\s*(([@](?P<rowonly>[+-]?[0-9><]+))|([$](?P<colonly>[+-]?[0-9><]+))|([@](?P<row>[+-]?[0-9><]+)[$](?P<col>[+-]?[0-9><]+)))\s*$`)
 
 // numeral describes the value and symbol of a single roman numeral
 type numeral struct {
