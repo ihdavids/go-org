@@ -198,7 +198,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 				val := strings.TrimSpace(table.GetVal(rowIdx, c+1))
 				if val != "" {
 					rowIdxUp, _ := table.GetRealRowCol(r-off, 0)
-					table.CellNames[val] = RowColRef{Row: rowIdxUp, Col: c + 1, RelativeRow: false, RelativeCol: false}
+					table.CellNames[val] = RowColRef{Row: rowIdxUp, Col: c + 1, RelativeRow: false, RelativeCol: false, WildRow: false, WildCol: false}
 				}
 			}
 			// Name the cell below this row
@@ -211,7 +211,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 				val := strings.TrimSpace(table.GetVal(rowIdx, c+1))
 				if val != "" {
 					rowIdxDown, _ := table.GetRealRowCol(r+2-off, 0)
-					table.CellNames[val] = RowColRef{Row: rowIdxDown, Col: c + 1, RelativeRow: false, RelativeCol: false}
+					table.CellNames[val] = RowColRef{Row: rowIdxDown, Col: c + 1, RelativeRow: false, RelativeCol: false, WildRow: false, WildCol: false}
 				}
 			}
 		}
@@ -757,7 +757,7 @@ func CreateNegIterator(rs, re int) func() int {
 type ColRefIterator func() *RowColRef
 
 func FixupPos(tbl *Table, p *RowColRef) *RowColRef {
-	r := RowColRef{Row: p.Row, Col: p.Col, RelativeCol: p.RelativeCol, RelativeRow: p.RelativeRow}
+	r := RowColRef{Row: p.Row, Col: p.Col, RelativeCol: p.RelativeCol, RelativeRow: p.RelativeRow, WildRow: p.WildRow, WildCol: p.WildCol}
 	if r.RelativeCol {
 		r.Col = ClampToMinMax(tbl.Cur.Col+r.Col, tbl.GetWidth())
 	}
