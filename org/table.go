@@ -918,7 +918,8 @@ func (s *Formulas) Process(tbl *Table) {
 				frm.Process(tbl)
 				frms = append(frms, frm)
 			}
-			startP = endP
+			// Skip over ::
+			startP = Pos{Row: endP.Row, Col: endP.Col + 2}
 		}
 	}
 	s.Formulas = frms
