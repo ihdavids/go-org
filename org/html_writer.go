@@ -23,7 +23,7 @@ type HTMLWriter struct {
 	PrettyRelativeLinks bool
 
 	strings.Builder
-	document   *Document
+	Document   *Document
 	htmlEscape bool
 	log        *log.Logger
 	footnotes  *footnotes
@@ -71,7 +71,7 @@ var tocHeadlineMaxLvlRegexp = regexp.MustCompile(`headlines\s+(\d+)`)
 func NewHTMLWriter() *HTMLWriter {
 	defaultConfig := New()
 	return &HTMLWriter{
-		document:   &Document{Configuration: defaultConfig},
+		Document:   &Document{Configuration: defaultConfig},
 		log:        defaultConfig.Log,
 		htmlEscape: true,
 		HighlightCodeBlock: func(source, lang string, inline bool) string {
@@ -103,17 +103,17 @@ func (w *HTMLWriter) WriterWithExtensions() Writer {
 }
 
 func (w *HTMLWriter) Before(d *Document) {
-	w.document = d
+	w.Document = d
 	w.log = d.Log
-	if title := d.Get("TITLE"); title != "" && w.document.GetOption("title") != "nil" {
+	if title := d.Get("TITLE"); title != "" && w.Document.GetOption("title") != "nil" {
 		titleDocument := d.Parse(strings.NewReader(title), d.Path)
 		if titleDocument.Error == nil {
 			title = w.WriteNodesAsString(titleDocument.Nodes...)
 		}
 		w.WriteString(fmt.Sprintf(`<h1 class="title">%s</h1>`+"\n", title))
 	}
-	if w.document.GetOption("toc") != "nil" {
-		maxLvl, _ := strconv.Atoi(w.document.GetOption("toc"))
+	if w.Document.GetOption("toc") != "nil" {
+		maxLvl, _ := strconv.Atoi(w.Document.GetOption("toc"))
 		w.WriteOutline(d, maxLvl)
 	}
 }
@@ -186,7 +186,7 @@ func (w *HTMLWriter) WriteKeyword(k Keyword) {
 	} else if k.Key == "TOC" {
 		if m := tocHeadlineMaxLvlRegexp.FindStringSubmatch(k.Value); m != nil {
 			maxLvl, _ := strconv.Atoi(m[1])
-			w.WriteOutline(w.document, maxLvl)
+			w.WriteOutline(w.Document, maxLvl)
 		}
 	}
 }
@@ -200,7 +200,7 @@ func (w *HTMLWriter) WriteFootnoteDefinition(f FootnoteDefinition) {
 }
 
 func (w *HTMLWriter) WriteFootnotes(d *Document) {
-	if w.document.GetOption("f") == "nil" || len(w.footnotes.list) == 0 {
+	if w.Document.GetOption("f") == "nil" || len(w.footnotes.list) == 0 {
 		return
 	}
 	w.WriteString(`<div class="footnotes">` + "\n")
@@ -238,7 +238,7 @@ func (w *HTMLWriter) WriteOutline(d *Document, maxLvl int) {
 }
 
 func (w *HTMLWriter) writeSection(section *Section, maxLvl int) {
-	if (maxLvl != 0 && section.Headline.Lvl > maxLvl) || section.Headline.IsExcluded(w.document) {
+	if (maxLvl != 0 && section.Headline.Lvl > maxLvl) || section.Headline.IsExcluded(w.Document) {
 		return
 	}
 	// NOTE: To satisfy hugo ExtractTOC() check we cannot use `<li>\n` here. Doesn't really matter, just a note.
@@ -261,21 +261,21 @@ func (w *HTMLWriter) writeSection(section *Section, maxLvl int) {
 }
 
 func (w *HTMLWriter) WriteHeadline(h Headline) {
-	if h.IsExcluded(w.document) {
+	if h.IsExcluded(w.Document) {
 		return
 	}
 
 	w.WriteString(fmt.Sprintf(`<div id="outline-container-%s" class="outline-%d">`, h.ID(), h.Lvl+1) + "\n")
 	w.WriteString(fmt.Sprintf(`<h%d id="%s">`, h.Lvl+1, h.ID()) + "\n")
-	if w.document.GetOption("todo") != "nil" && h.Status != "" {
+	if w.Document.GetOption("todo") != "nil" && h.Status != "" {
 		w.WriteString(fmt.Sprintf(`<span class="todo">%s</span>`, h.Status) + "\n")
 	}
-	if w.document.GetOption("pri") != "nil" && h.Priority != "" {
+	if w.Document.GetOption("pri") != "nil" && h.Priority != "" {
 		w.WriteString(fmt.Sprintf(`<span class="priority">[%s]</span>`, h.Priority) + "\n")
 	}
 
 	WriteNodes(w, h.Title...)
-	if w.document.GetOption("tags") != "nil" && len(h.Tags) != 0 {
+	if w.Document.GetOption("tags") != "nil" && len(h.Tags) != 0 {
 		tags := make([]string, len(h.Tags))
 		for i, tag := range h.Tags {
 			tags[i] = fmt.Sprintf(`<span>%s</span>`, tag)
@@ -293,7 +293,7 @@ func (w *HTMLWriter) WriteHeadline(h Headline) {
 func (w *HTMLWriter) WriteText(t Text) {
 	if !w.htmlEscape {
 		w.WriteString(t.Content)
-	} else if w.document.GetOption("e") == "nil" || t.IsRaw {
+	} else if w.Document.GetOption("e") == "nil" || t.IsRaw {
 		w.WriteString(html.EscapeString(t.Content))
 	} else {
 		w.WriteString(html.EscapeString(htmlEntityReplacer.Replace(t.Content)))
@@ -321,7 +321,7 @@ func (w *HTMLWriter) WriteStatisticToken(s StatisticToken) {
 }
 
 func (w *HTMLWriter) WriteLineBreak(l LineBreak) {
-	if w.document.GetOption("ealb") == "nil" || !l.BetweenMultibyteCharacters {
+	if w.Document.GetOption("ealb") == "nil" || !l.BetweenMultibyteCharacters {
 		w.WriteString(strings.Repeat("\n", l.Count))
 	}
 }
@@ -331,7 +331,7 @@ func (w *HTMLWriter) WriteExplicitLineBreak(l ExplicitLineBreak) {
 }
 
 func (w *HTMLWriter) WriteFootnoteLink(l FootnoteLink) {
-	if w.document.GetOption("f") == "nil" {
+	if w.Document.GetOption("f") == "nil" {
 		return
 	}
 	i := w.footnotes.add(l)
@@ -340,7 +340,7 @@ func (w *HTMLWriter) WriteFootnoteLink(l FootnoteLink) {
 }
 
 func (w *HTMLWriter) WriteTimestamp(t Timestamp) {
-	if w.document.GetOption("<") == "nil" {
+	if w.Document.GetOption("<") == "nil" {
 		return
 	}
 	w.WriteString(`<span class="timestamp">`)
@@ -365,7 +365,7 @@ func (w *HTMLWriter) WriteTimestamp(t Timestamp) {
 }
 
 func (w *HTMLWriter) WriteSDC(s SDC) {
-	if w.document.GetOption("<") == "nil" {
+	if w.Document.GetOption("<") == "nil" {
 		return
 	}
 	name := ""
@@ -396,7 +396,7 @@ func (w *HTMLWriter) WriteSDC(s SDC) {
 }
 
 func (w *HTMLWriter) WriteClock(s Clock) {
-	if w.document.GetOption("<") == "nil" {
+	if w.Document.GetOption("<") == "nil" {
 		return
 	}
 	name := "CLOCK"
@@ -429,13 +429,13 @@ func (w *HTMLWriter) WriteRegularLink(l RegularLink) {
 	} else if isRelative && strings.HasSuffix(url, ".org") {
 		url = strings.TrimSuffix(url, ".org") + ".html"
 	}
-	if prefix := w.document.Links[l.Protocol]; prefix != "" {
+	if prefix := w.Document.Links[l.Protocol]; prefix != "" {
 		if tag := strings.TrimPrefix(l.URL, l.Protocol+":"); strings.Contains(prefix, "%s") || strings.Contains(prefix, "%h") {
 			url = html.EscapeString(strings.ReplaceAll(strings.ReplaceAll(prefix, "%s", tag), "%h", u.QueryEscape(tag)))
 		} else {
 			url = html.EscapeString(prefix) + tag
 		}
-	} else if prefix := w.document.Links[l.URL]; prefix != "" {
+	} else if prefix := w.Document.Links[l.URL]; prefix != "" {
 		url = html.EscapeString(strings.ReplaceAll(strings.ReplaceAll(prefix, "%s", ""), "%h", ""))
 	}
 	switch l.Kind() {
@@ -463,11 +463,11 @@ func (w *HTMLWriter) WriteRegularLink(l RegularLink) {
 }
 
 func (w *HTMLWriter) WriteMacro(m Macro) {
-	if macro := w.document.Macros[m.Name]; macro != "" {
+	if macro := w.Document.Macros[m.Name]; macro != "" {
 		for i, param := range m.Parameters {
 			macro = strings.Replace(macro, fmt.Sprintf("$%d", i+1), param, -1)
 		}
-		macroDocument := w.document.Parse(strings.NewReader(macro), w.document.Path)
+		macroDocument := w.Document.Parse(strings.NewReader(macro), w.Document.Path)
 		if macroDocument.Error != nil {
 			w.log.Printf("bad macro: %s -> %s: %v", m.Name, macro, macroDocument.Error)
 		}
