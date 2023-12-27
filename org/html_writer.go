@@ -16,10 +16,16 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+type HeadlineWriterOverride interface {
+	WriteHeadlineOverride(h Headline)
+}
+
 // HTMLWriter exports an org document into a html document.
 type HTMLWriter struct {
-	ExtendingWriter     Writer
-	HighlightCodeBlock  func(source, lang string, inline bool) string
+	ExtendingWriter        Writer
+	HighlightCodeBlock     func(source, lang string, inline bool) string
+	HeadlineWriterOverride HeadlineWriterOverride
+
 	PrettyRelativeLinks bool
 
 	strings.Builder
@@ -262,6 +268,10 @@ func (w *HTMLWriter) writeSection(section *Section, maxLvl int) {
 
 func (w *HTMLWriter) WriteHeadline(h Headline) {
 	if h.IsExcluded(w.Document) {
+		return
+	}
+	if w.HeadlineWriterOverride != nil {
+		w.HeadlineWriterOverride.WriteHeadlineOverride(h)
 		return
 	}
 
