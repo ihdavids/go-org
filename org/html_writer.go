@@ -24,6 +24,7 @@ type HeadlineWriterOverride interface {
 type HTMLWriter struct {
 	ExtendingWriter        Writer
 	HighlightCodeBlock     func(keywords []Keyword, source, lang string, inline bool) string
+	NoWrapCodeBlock        bool
 	HeadlineWriterOverride HeadlineWriterOverride
 
 	PrettyRelativeLinks bool
@@ -144,7 +145,11 @@ func (w *HTMLWriter) WriteBlock(b Block) {
 			lang = strings.ToLower(b.Parameters[0])
 		}
 		content = w.HighlightCodeBlock(b.Keywords, content, lang, false)
-		w.WriteString(fmt.Sprintf("<div class=\"src src-%s\">\n%s\n</div>\n", lang, content))
+		if w.NoWrapCodeBlock {
+			w.WriteString(fmt.Sprintf("\n%s\n", content))
+		} else {
+			w.WriteString(fmt.Sprintf("<div class=\"src src-%s\">\n%s\n</div>\n", lang, content))
+		}
 	case "EXAMPLE":
 		w.WriteString(`<pre class="example">` + "\n" + html.EscapeString(content) + "\n</pre>\n")
 	case "EXPORT":
@@ -174,7 +179,11 @@ func (w *HTMLWriter) WriteInlineBlock(b InlineBlock) {
 	case "src":
 		lang := strings.ToLower(b.Parameters[0])
 		content = w.HighlightCodeBlock(b.Keywords, content, lang, true)
-		w.WriteString(fmt.Sprintf("<div class=\"src src-inline src-%s\">\n%s\n</div>", lang, content))
+		if w.NoWrapCodeBlock {
+			w.WriteString(fmt.Sprintf("\n%s\n", content))
+		} else {
+			w.WriteString(fmt.Sprintf("<div class=\"src src-inline src-%s\">\n%s\n</div>", lang, content))
+		}
 	case "export":
 		if strings.ToLower(b.Parameters[0]) == "html" {
 			w.WriteString(content)
