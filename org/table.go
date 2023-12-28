@@ -24,6 +24,7 @@ type Table struct {
 	ColNames         map[string]int
 	CellNames        map[string]RowColRef
 	Params           map[string]string
+	Keywords         []Keyword
 }
 
 type Row struct {
@@ -119,7 +120,8 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false, false, false, false}, nil, nil, nil}
+	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false, false, false, false}, nil, nil, nil, d.lastKeywords}
+	d.lastKeywords = nil
 	var starts []Pos
 	var ends []Pos
 	for r, rawColumns := range rawRows {

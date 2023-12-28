@@ -95,6 +95,8 @@ func (d *Document) parseKeyword(i int, stop stopFn) (int, Node) {
 		} else {
 			d.BufferSettings[k.Key] = k.Value
 		}
+		// Keep a record of all generic keywords that did not have a direct impact on a node.
+		d.lastKeywords = append(d.lastKeywords, k)
 		return 1, k
 	}
 }
@@ -196,7 +198,9 @@ func (d *Document) parseInclude(k Keyword, ni int) (int, Node) {
 				d.Log.Printf("Bad include %#v: %s", k, err)
 				return k
 			}
-			return Block{strings.ToUpper(kind), k.Pos, k.GetEnd(), []string{lang}, d.parseRawInline(string(bs), ni), nil}
+			b := Block{strings.ToUpper(kind), k.Pos, k.GetEnd(), []string{lang}, d.parseRawInline(string(bs), ni), nil, d.lastKeywords}
+			d.lastKeywords = nil
+			return b
 		}
 	}
 	p := k.GetEnd()

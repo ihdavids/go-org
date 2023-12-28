@@ -105,6 +105,7 @@ func reMatchParams(re *regexp.Regexp, m []string) (paramsMap map[string]string) 
 }
 
 func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
+	d.lastKeywords = nil
 	pos := d.tokens[i].Pos()
 	t, headline := d.tokens[i], &Headline{Pos: pos, EndPos: d.tokens[i].EndPos()}
 	headline.Lvl = len(t.matches[1])

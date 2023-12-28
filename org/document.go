@@ -69,6 +69,7 @@ type Document struct {
 	BufferSettings  map[string]string // Settings contains all settings that were parsed from keywords.
 	Error           error
 	currentHeadline HeadlineStack
+	lastKeywords    []Keyword // Track keywords before blocks and other items
 }
 
 type NodeType int

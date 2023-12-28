@@ -13,6 +13,7 @@ type Block struct {
 	Parameters []string
 	Children   []Node
 	Result     Node
+	Keywords   []Keyword
 }
 
 type Result struct {
@@ -86,7 +87,8 @@ func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 	stop := func(d *Document, i int) bool {
 		return i >= len(d.tokens) || (d.tokens[i].kind == "endBlock" && d.tokens[i].content == name)
 	}
-	block, i := &Block{name, d.tokens[start].Pos(), d.tokens[start].EndPos(), parameters, nil, nil}, i+1
+	block, i := &Block{name, d.tokens[start].Pos(), d.tokens[start].EndPos(), parameters, nil, nil, d.lastKeywords}, i+1
+	d.lastKeywords = nil
 	if isRawTextBlock(name) {
 		rawText := ""
 		for ; !stop(d, i); i++ {
