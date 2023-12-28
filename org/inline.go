@@ -459,7 +459,7 @@ func isValidPostChar(r rune) bool {
 func isValidBorderChar(r rune) bool { return !unicode.IsSpace(r) }
 
 func (l RegularLink) Kind() string {
-	description := String(l.Description)
+	description := String(l.Description...)
 	descProtocol, descExt := strings.SplitN(description, ":", 2)[0], path.Ext(description)
 	if ok := descProtocol == "file" || descProtocol == "http" || descProtocol == "https"; ok && imageExtensionRegexp.MatchString(descExt) {
 		return "image"

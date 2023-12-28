@@ -23,7 +23,7 @@ type HeadlineWriterOverride interface {
 // HTMLWriter exports an org document into a html document.
 type HTMLWriter struct {
 	ExtendingWriter        Writer
-	HighlightCodeBlock     func(keywords []Keyword, source, lang string, inline bool) string
+	HighlightCodeBlock     func(keywords []Keyword, source, lang string, inline bool, params map[string]string) string
 	NoWrapCodeBlock        bool
 	HeadlineWriterOverride HeadlineWriterOverride
 
@@ -81,7 +81,7 @@ func NewHTMLWriter() *HTMLWriter {
 		Document:   &Document{Configuration: defaultConfig},
 		log:        defaultConfig.Log,
 		htmlEscape: true,
-		HighlightCodeBlock: func(keywords []Keyword, source, lang string, inline bool) string {
+		HighlightCodeBlock: func(keywords []Keyword, source, lang string, inline bool, params map[string]string) string {
 			if inline {
 				return fmt.Sprintf("<div class=\"highlight-inline\">\n<pre>\n%s\n</pre>\n</div>", html.EscapeString(source))
 			}
@@ -144,7 +144,7 @@ func (w *HTMLWriter) WriteBlock(b Block) {
 		if len(b.Parameters) >= 1 {
 			lang = strings.ToLower(b.Parameters[0])
 		}
-		content = w.HighlightCodeBlock(b.Keywords, content, lang, false)
+		content = w.HighlightCodeBlock(b.Keywords, content, lang, false, params)
 		if w.NoWrapCodeBlock {
 			w.WriteString(fmt.Sprintf("\n%s\n", content))
 		} else {
@@ -178,7 +178,7 @@ func (w *HTMLWriter) WriteInlineBlock(b InlineBlock) {
 	switch b.Name {
 	case "src":
 		lang := strings.ToLower(b.Parameters[0])
-		content = w.HighlightCodeBlock(b.Keywords, content, lang, true)
+		content = w.HighlightCodeBlock(b.Keywords, content, lang, true, nil)
 		if w.NoWrapCodeBlock {
 			w.WriteString(fmt.Sprintf("\n%s\n", content))
 		} else {
@@ -462,14 +462,14 @@ func (w *HTMLWriter) WriteRegularLink(l RegularLink) {
 		if l.Description == nil {
 			w.WriteString(fmt.Sprintf(`<img src="%s" alt="%s" title="%s" />`, url, url, url))
 		} else {
-			description := strings.TrimPrefix(String(l.Description), "file:")
+			description := strings.TrimPrefix(String(l.Description...), "file:")
 			w.WriteString(fmt.Sprintf(`<a href="%s"><img src="%s" alt="%s" /></a>`, url, description, description))
 		}
 	case "video":
 		if l.Description == nil {
 			w.WriteString(fmt.Sprintf(`<video src="%s" title="%s">%s</video>`, url, url, url))
 		} else {
-			description := strings.TrimPrefix(String(l.Description), "file:")
+			description := strings.TrimPrefix(String(l.Description...), "file:")
 			w.WriteString(fmt.Sprintf(`<a href="%s"><video src="%s" title="%s"></video></a>`, url, description, description))
 		}
 	default:
