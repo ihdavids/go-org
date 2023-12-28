@@ -71,6 +71,7 @@ type InlineBlock struct {
 	Name       string
 	Parameters []string
 	Children   []Node
+	Keywords   []Keyword
 }
 
 type LatexFragment struct {
@@ -227,14 +228,18 @@ func (d *Document) parseInlineBlock(input string, start int, ni int) (int, int, 
 		return 0, 0, nil
 	}
 	if m := inlineBlockRegexp.FindStringSubmatch(input[start-3:]); m != nil {
-		return 3, len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, start + len(m[0])}, "src", strings.Fields(m[1] + " " + m[3]), d.parseRawInline(m[4], ni)}
+		temp := d.lastKeywords
+		d.lastKeywords = nil
+		return 3, len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, start + len(m[0])}, "src", strings.Fields(m[1] + " " + m[3]), d.parseRawInline(m[4], ni), temp}
 	}
 	return 0, 0, nil
 }
 
 func (d *Document) parseInlineExportBlock(input string, start int, ni int) (int, Node) {
 	if m := inlineExportBlockRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, start + len(m[0])}, "export", m[1:2], d.parseRawInline(m[2], ni)}
+		temp := d.lastKeywords
+		d.lastKeywords = nil
+		return len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, start + len(m[0])}, "export", m[1:2], d.parseRawInline(m[2], ni), temp}
 	}
 	return 0, nil
 }

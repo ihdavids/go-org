@@ -23,7 +23,7 @@ type HeadlineWriterOverride interface {
 // HTMLWriter exports an org document into a html document.
 type HTMLWriter struct {
 	ExtendingWriter        Writer
-	HighlightCodeBlock     func(source, lang string, inline bool) string
+	HighlightCodeBlock     func(keywords []Keyword, source, lang string, inline bool) string
 	HeadlineWriterOverride HeadlineWriterOverride
 
 	PrettyRelativeLinks bool
@@ -80,7 +80,7 @@ func NewHTMLWriter() *HTMLWriter {
 		Document:   &Document{Configuration: defaultConfig},
 		log:        defaultConfig.Log,
 		htmlEscape: true,
-		HighlightCodeBlock: func(source, lang string, inline bool) string {
+		HighlightCodeBlock: func(keywords []Keyword, source, lang string, inline bool) string {
 			if inline {
 				return fmt.Sprintf("<div class=\"highlight-inline\">\n<pre>\n%s\n</pre>\n</div>", html.EscapeString(source))
 			}
@@ -143,7 +143,7 @@ func (w *HTMLWriter) WriteBlock(b Block) {
 		if len(b.Parameters) >= 1 {
 			lang = strings.ToLower(b.Parameters[0])
 		}
-		content = w.HighlightCodeBlock(content, lang, false)
+		content = w.HighlightCodeBlock(b.Keywords, content, lang, false)
 		w.WriteString(fmt.Sprintf("<div class=\"src src-%s\">\n%s\n</div>\n", lang, content))
 	case "EXAMPLE":
 		w.WriteString(`<pre class="example">` + "\n" + html.EscapeString(content) + "\n</pre>\n")
@@ -173,7 +173,7 @@ func (w *HTMLWriter) WriteInlineBlock(b InlineBlock) {
 	switch b.Name {
 	case "src":
 		lang := strings.ToLower(b.Parameters[0])
-		content = w.HighlightCodeBlock(content, lang, true)
+		content = w.HighlightCodeBlock(b.Keywords, content, lang, true)
 		w.WriteString(fmt.Sprintf("<div class=\"src src-inline src-%s\">\n%s\n</div>", lang, content))
 	case "export":
 		if strings.ToLower(b.Parameters[0]) == "html" {
