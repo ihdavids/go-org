@@ -32,8 +32,10 @@ type NodeWithMeta struct {
 }
 
 type Metadata struct {
-	Caption        [][]Node
-	HTMLAttributes [][]string
+	Caption         [][]Node
+	HTMLAttributes  [][]string
+	LatexAttributes [][]string
+	LatexEnv        string
 }
 
 type Include struct {
@@ -81,7 +83,7 @@ func (d *Document) parseKeyword(i int, stop stopFn) (int, Node) {
 			d.Macros[parts[0]] = parts[1]
 		}
 		return 1, k
-	case "CAPTION", "ATTR_HTML":
+	case "CAPTION", "ATTR_HTML", "ENV", "ATTR_LATEX":
 		consumed, node := d.parseAffiliated(i, stop)
 		if consumed != 0 {
 			return consumed, node
@@ -159,6 +161,26 @@ func (d *Document) parseAffiliated(i int, stop stopFn) (int, Node) {
 				}
 			}
 			meta.HTMLAttributes = append(meta.HTMLAttributes, attributes)
+		case "ATTR_LATEX":
+			attributes, rest := []string{}, k.Value
+			for {
+				if k, m := "", attributeRegexp.FindStringSubmatch(rest); m != nil {
+					k, rest = m[1], m[2]
+					attributes = append(attributes, k)
+					if v, m := "", attributeRegexp.FindStringSubmatchIndex(rest); m != nil {
+						v, rest = rest[:m[0]], rest[m[0]:]
+						attributes = append(attributes, v)
+					} else {
+						attributes = append(attributes, strings.TrimSpace(rest))
+						break
+					}
+				} else {
+					break
+				}
+			}
+			meta.LatexAttributes = append(meta.LatexAttributes, attributes)
+		case "ENV":
+			meta.LatexEnv = strings.TrimSpace(k.Value)
 		default:
 			return 0, nil
 		}

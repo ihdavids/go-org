@@ -333,6 +333,17 @@ func (w *OrgWriter) WriteNodeWithMeta(n NodeWithMeta) {
 		w.WriteString("#+ATTR_HTML: ")
 		w.WriteString(strings.Join(attributes, " ") + "\n")
 	}
+	for _, attributes := range n.Meta.LatexAttributes {
+		w.WriteIndent()
+		w.WriteString("#+ATTR_LATEX: ")
+		w.WriteString(strings.Join(attributes, " ") + "\n")
+	}
+	if env := n.Meta.LatexEnv; env != "" {
+		w.WriteIndent()
+		w.WriteString("#+ENV: ")
+		w.WriteString(env + "\n")
+
+	}
 	idx := w.Idx
 	w.LastLineBreak = w.Idx - 1
 	WriteNodesLB(idx, w, n.Node)
