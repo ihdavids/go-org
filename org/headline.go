@@ -177,15 +177,23 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 		return parentStop(d, i) || d.tokens[i].kind == "headline" && len(d.tokens[i].matches[1]) <= headline.Lvl
 	}
 	consumed, nodes := d.parseMany(i+1, stop)
-	if len(nodes) > 0 {
-		if d, ok := nodes[0].(*PropertyDrawer); ok {
-			headline.Properties = d
-			nodes = nodes[1:]
-		} else if d, ok := nodes[0].(*Drawer); ok {
-			headline.Drawers = append(headline.Drawers, d)
-		} else if d, ok := nodes[0].(*Block); ok {
-			headline.Blocks = append(headline.Blocks, d)
+	// Scan the first few nodes for the PropertyDrawer.
+	// In org-mode, planning lines (SCHEDULED/DEADLINE/CLOSED) come before
+	// the property drawer, so it may not be nodes[0].
+	for j := 0; j < len(nodes); j++ {
+		switch nd := nodes[j].(type) {
+		case SDC:
+			// Skip planning lines — they precede the property drawer
+			continue
+		case *PropertyDrawer:
+			headline.Properties = nd
+			nodes = append(nodes[:j], nodes[j+1:]...)
+		case *Drawer:
+			headline.Drawers = append(headline.Drawers, nd)
+		case *Block:
+			headline.Blocks = append(headline.Blocks, nd)
 		}
+		break
 	}
 	headline.Children = nodes
 	d.Outline.lastHash.Pop()
