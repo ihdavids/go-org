@@ -103,6 +103,10 @@ func reMatchParams(re *regexp.Regexp, m []string) (paramsMap map[string]string) 
 	}
 	return paramsMap
 }
+func isHeadlineNode(d *Document, i int) bool {
+	k := d.tokens[i].kind
+	return k == "headline" || k == "scheduled" || k == "deadline" || k == "beginDrawer" || k == "beginBlock"
+}
 
 func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	d.lastKeywords = nil
@@ -174,20 +178,30 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	d.Outline.lastHash.Push(tHash)
 
 	stop := func(d *Document, i int) bool {
-		return parentStop(d, i) || d.tokens[i].kind == "headline" && len(d.tokens[i].matches[1]) <= headline.Lvl
+		return parentStop(d, i) || isHeadlineNode(d, i) && len(d.tokens[i].matches[1]) <= headline.Lvl
 	}
 	consumed, nodes := d.parseMany(i+1, stop)
 	// Scan the first few nodes for the PropertyDrawer.
 	// In org-mode, planning lines (SCHEDULED/DEADLINE/CLOSED) come before
 	// the property drawer, so it may not be nodes[0].
+	// We also skip empty paragraphs (blank lines) that may appear between
+	// planning lines and the property drawer.
 	for j := 0; j < len(nodes); j++ {
 		switch nd := nodes[j].(type) {
 		case SDC:
 			// Skip planning lines — they precede the property drawer
 			continue
+		case Paragraph:
+			// Skip empty paragraphs (blank lines / whitespace) between
+			// planning lines and the property drawer.
+			if len(nd.Children) == 0 {
+				continue
+			}
 		case *PropertyDrawer:
 			headline.Properties = nd
 			nodes = append(nodes[:j], nodes[j+1:]...)
+			j -= 1
+			continue
 		case *Drawer:
 			headline.Drawers = append(headline.Drawers, nd)
 		case *Block:
