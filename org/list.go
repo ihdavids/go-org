@@ -129,7 +129,16 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 	}
 	d.baseLvl = originalBaseLvl
 	if l.Kind == "descriptive" {
-		return i - start, DescriptiveListItem{bullet, status, pos, d.parseInline(dterm, i), nodes}
+		// The term is parsed against `start`, the item's own first token, and
+		// not against `i` - which the loop above has just walked to the end of
+		// the item, and often past the end of the document. parseInline reads
+		// d.tokens[ni] for the positions it hangs on the nodes it makes, so an
+		// out of range index there panicked the whole parse: every descriptive
+		// list in org, `- term :: definition`, made its file unparseable, and
+		// every exporter got an empty document with an error on it rather than
+		// the file. `start` is also the right answer rather than merely a safe
+		// one: the term really is written on that line.
+		return i - start, DescriptiveListItem{bullet, status, pos, d.parseInline(dterm, start), nodes}
 	}
 	return i - start, ListItem{bullet, status, value, pos, nodes}
 }

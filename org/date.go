@@ -103,7 +103,13 @@ func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) strin
 
 	var regex_date_time = `(?P<{{.prefix}}year>\d{4}) *\- *(?P<{{.prefix}}month>\d{1,2}) *\- *(?P<{{.prefix}}day>\d{1,2}) *(?P<{{.prefix}}weekday>[A-Za-z]{3})? *((?P<{{.prefix}}hour>\d{1,2}) *: *(?P<{{.prefix}}min>\d{2})( *\-\-? *(?P<{{.prefix}}end_hour>\d{1,2}) *: *(?P<{{.prefix}}end_min>\d{2}))?)?`
 
-	var regex_cookie = `((?P<{{.prefix}}repeatpre> *[.+]{1,2})(?P<{{.prefix}}repeatnum> *\d+)(?P<{{.prefix}}repeatdwmy> *[dwmy]))?(({{.ignore}}+?)(?P<{{.prefix}}warnpre> *\-)(?P<{{.prefix}}warnnum> *\d+)(?P<{{.prefix}}warndwmy> *[dwmy]))?`
+	// The `/4d` half of `.+2d/4d` is org-habit's slack: do this every two days,
+	// and treat it as definitely overdue after four. Without it in the pattern
+	// the whole timestamp failed to match, so a habit written the way org-habit
+	// documents had no scheduled date at all as far as anything reading this
+	// could tell - the planning line was re-read as body text and the heading
+	// came back with Scheduled nil.
+	var regex_cookie = `((?P<{{.prefix}}repeatpre> *[.+]{1,2})(?P<{{.prefix}}repeatnum> *\d+)(?P<{{.prefix}}repeatdwmy> *[dwmy])(/(?P<{{.prefix}}repeatmaxnum>\d+)(?P<{{.prefix}}repeatmaxdwmy>[dwmy]))?)?(({{.ignore}}+?)(?P<{{.prefix}}warnpre> *\-)(?P<{{.prefix}}warnnum> *\d+)(?P<{{.prefix}}warndwmy> *[dwmy]))?`
 
 	// http://www.pythonregex.com/
 	if nocookie || brtype == NoBracket {
@@ -129,7 +135,15 @@ func CompileSDCRe(sdctype string) *DateParser {
 	}
 	var mm = map[string]interface{}{
 		"sdctype": sdctype,
-		"timere":  GenTimestampRegex(brtype, "", true),
+		// Cookies allowed, because a planning line is exactly where org puts
+		// them: `SCHEDULED: <2026-09-28 Mon +1w>` is a weekly task and
+		// `SCHEDULED: <2026-09-28 Mon .+1d>` is a habit. Built with nocookie,
+		// this regex wanted the closing bracket immediately after the day, so
+		// none of those lines matched at all - and a line that does not match
+		// is not a planning line: the date never reached Headline.Scheduled,
+		// the agenda never saw it, and the repeat was dropped on the next
+		// rewrite of the file.
+		"timere": GenTimestampRegex(brtype, "", false),
 	}
 	var tmpl string = `^([^#]*){{.sdctype}}:\s+{{.timere}}`
 	tmp, err := AString(tmpl).Format(mm)
@@ -251,6 +265,12 @@ type OrgDate struct {
 	RepeatRule *rrule.RRule
 	RepeatPre  string
 	RepeatDWMY string
+	// org-habit's slack half - the `4d` of `.+2d/4d`. Kept as it was written
+	// rather than as a duration, because it has to be written back exactly: a
+	// repeater that parses and then loses half of itself on the next write is
+	// worse than one that never parsed.
+	RepeatMaxNum  string
+	RepeatMaxDWMY string
 
 	WarnRule *rrule.RRule
 	WarnPre  string
@@ -328,6 +348,12 @@ func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 				*/
 				Dtstart: orgDate.Start})
 			orgDate.RepeatRule = rr
+			if mn, ok := match["repeatmaxnum"]; ok && mn != "" {
+				if md, ok := match["repeatmaxdwmy"]; ok && md != "" {
+					orgDate.RepeatMaxNum = mn
+					orgDate.RepeatMaxDWMY = md
+				}
+			}
 			// This determines what to do when you mark the task as done.
 			// + just bump to the next FIXED interval (even if thats in the past)
 			// ++ bump to the next FIXED interval, in the future. (IE next sunday) even if you missed some.
@@ -552,7 +578,46 @@ func (self *OrgDate) ToDate() string {
 		bs, be = "[", "]"
 		break
 	}
-	return bs + self.Start.Format("2006-01-02 Mon") + end + be
+	// The repeater and the warning period belong on a date with no time just as
+	// much as on one with a time. This used to write only the day, so a
+	// <2026-09-28 Mon +1w> read in and written back out came out as
+	// <2026-09-28 Mon> - the repeat silently dropped on every rewrite of the
+	// file, which for a habit is the whole of what the timestamp said.
+	return bs + self.Start.Format("2006-01-02 Mon") + self.repeatSuffix() + end + be
+}
+
+// The +1w / .+2d / ++1m cookie and the -3d warning, as org writes them. Shared
+// by ToDate and ToString so the two cannot disagree about a date that differs
+// only in having a time on it.
+//
+// Each captured part is trimmed and given exactly one leading space rather than
+// being concatenated as captured: the tokeniser's groups are written ` *[.+]{1,2}`
+// and ` *[dwmy]`, so they may or may not carry a space of their own depending on
+// how the file was written, and pasting them together gives "05:45  +1d" for one
+// file and "05:45+1d" for the next.
+func (self *OrgDate) repeatSuffix() string {
+	out := ""
+	if num := ruleInterval(self.RepeatRule, self.RepeatDWMY); self.RepeatDWMY != "" &&
+		self.RepeatPre != "" {
+		out += " " + strings.TrimSpace(self.RepeatPre) + num + strings.TrimSpace(self.RepeatDWMY)
+		if self.RepeatMaxNum != "" && self.RepeatMaxDWMY != "" {
+			out += "/" + self.RepeatMaxNum + self.RepeatMaxDWMY
+		}
+	}
+	if num := ruleInterval(self.WarnRule, self.WarnDWMY); self.WarnDWMY != "" &&
+		self.WarnPre != "" {
+		out += " " + strings.TrimSpace(self.WarnPre) + num + strings.TrimSpace(self.WarnDWMY)
+	}
+	return out
+}
+
+// ruleInterval is the number in a cookie, taken from the rule that was built for
+// it. A cookie with no rule behind it writes no number rather than a zero.
+func ruleInterval(rule *rrule.RRule, dwmy string) string {
+	if rule == nil || dwmy == "" {
+		return ""
+	}
+	return fmt.Sprintf("%d", rule.Options.Interval)
 }
 
 func (self *OrgDate) IsZero() bool {
@@ -576,15 +641,10 @@ func (self *OrgDate) ToString() string {
 		bs, be = "[", "]"
 		break
 	}
-	var intNum string = ""
-	if self.RepeatRule != nil && self.RepeatDWMY != "" {
-		intNum = fmt.Sprintf("%d", self.RepeatRule.Options.Interval)
-	}
-	var wintNum string = ""
-	if self.WarnRule != nil && self.WarnDWMY != "" {
-		intNum = fmt.Sprintf("%d", self.WarnRule.Options.Interval)
-	}
-	return bs + self.Start.Format("2006-01-02 Mon 15:04") + self.RepeatPre + intNum + self.RepeatDWMY + self.WarnPre + wintNum + self.WarnDWMY + end + be
+	// The warning interval used to be written into intNum, which is the
+	// repeater's number: a date carrying both came out with the repeat's
+	// interval printed twice and the warning's not at all.
+	return bs + self.Start.Format("2006-01-02 Mon 15:04") + self.repeatSuffix() + end + be
 }
 
 func (self *OrgDate) ToClockString() string {

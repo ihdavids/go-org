@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -220,6 +221,12 @@ type SDC struct {
 	EndPos   Pos
 	Date     *OrgDate
 	DateType DateType
+
+	// The other planning keywords written on the same line, in the order they
+	// appear there. Org puts all of a heading's planning on one line, so this is
+	// the usual case rather than an oddity; keeping them on the node is what
+	// lets one line be written back as one line.
+	Others []SDC
 }
 
 type Clock struct {
@@ -240,41 +247,103 @@ func (d *Document) parseClock(i int, parentStop stopFn) (int, Node) {
 	}
 	return 1, tclk
 }
-func (d *Document) parseScheduled(i int, parentStop stopFn) (int, Node) {
-	s, dt := ParseSDC(d.tokens[i].content)
-	sdc := SDC{d.tokens[i].Pos(), d.tokens[i].EndPos(), s, dt}
-	if d.Outline.last != nil && d.Outline.last.Headline != nil {
-		d.Outline.last.Headline.Scheduled = &sdc
+
+// A planning line may carry more than one keyword, and every one of them has to
+// be read.
+//
+// Org writes `DEADLINE: <...> SCHEDULED: <...>` on one line whenever a heading
+// has both, and adds `CLOSED: [...]` to the front of it when the heading is
+// marked done. The lexer claims such a line for whichever keyword it recognised
+// first and the parse then read that one and threw the line away - so a heading
+// with a deadline and a schedule had no deadline, and a done heading with a
+// deadline had no closing time. Nothing said so: the date simply never reached
+// the headline.
+//
+// So all three are looked for in the line, ordered as they were written, and the
+// first becomes the node with the rest hanging off it - which is what lets the
+// writer put the line back as one line rather than splitting it.
+func (d *Document) parsePlanning(i int, parentStop stopFn) (int, Node) {
+	content := d.tokens[i].content
+	pos, endPos := d.tokens[i].Pos(), d.tokens[i].EndPos()
+	type found struct {
+		at  int
+		sdc SDC
 	}
-	return 1, sdc
-}
-func (d *Document) parseDeadline(i int, parentStop stopFn) (int, Node) {
-	s, dt := ParseSDC(d.tokens[i].content)
-	sdc := SDC{d.tokens[i].Pos(), d.tokens[i].EndPos(), s, dt}
-	if d.Outline.last != nil && d.Outline.last.Headline != nil {
-		d.Outline.last.Headline.Deadline = &sdc
+	var parts []found
+	for _, p := range []struct {
+		name   string
+		parser *DateParser
+		dt     DateType
+	}{
+		{"SCHEDULED", OrgDateScheduled, Scheduled},
+		{"DEADLINE", OrgDateDeadline, Deadline},
+		{"CLOSED", OrgDateClosed, Closed},
+	} {
+		at := strings.Index(content, p.name+":")
+		if at < 0 {
+			continue
+		}
+		date, _ := p.parser.Parse(content)
+		if date == nil {
+			continue
+		}
+		parts = append(parts, found{at, SDC{pos, endPos, date, p.dt, nil}})
 	}
-	return 1, sdc
-}
-func (d *Document) parseClosed(i int, parentStop stopFn) (int, Node) {
-	s, dt := ParseSDC(d.tokens[i].content)
-	sdc := SDC{d.tokens[i].Pos(), d.tokens[i].EndPos(), s, dt}
-	if d.Outline.last != nil && d.Outline.last.Headline != nil {
-		d.Outline.last.Headline.Closed = &sdc
+	if len(parts) == 0 {
+		// Nothing parsed. Keep the old shape - an SDC with a nil date - rather
+		// than handing the line to the paragraph parser, which would be a
+		// different answer to the one this has always given.
+		s, dt := ParseSDC(content)
+		return 1, SDC{pos, endPos, s, dt, nil}
 	}
-	return 1, sdc
+	sort.SliceStable(parts, func(a, b int) bool { return parts[a].at < parts[b].at })
+
+	sdcs := make([]SDC, len(parts))
+	for k := range parts {
+		sdcs[k] = parts[k].sdc
+	}
+	if d.Outline.last != nil && d.Outline.last.Headline != nil {
+		h := d.Outline.last.Headline
+		for k := range sdcs {
+			switch sdcs[k].DateType {
+			case Scheduled:
+				h.Scheduled = &sdcs[k]
+			case Deadline:
+				h.Deadline = &sdcs[k]
+			case Closed:
+				h.Closed = &sdcs[k]
+			}
+		}
+	}
+	node := sdcs[0]
+	node.Others = sdcs[1:]
+	return 1, node
 }
 
+// Take the cookie off each keyword of a `#+TODO:` line, leaving the keyword.
+//
+// A cookie is not always one character. `TODO(t)` is a keyword with an access
+// key, and this used to handle that and only that - it required the cookie to be
+// exactly three characters long, `(x)`. But org's logging notation puts more in
+// there: `NEXT(n!)` logs a timestamp on entering NEXT, `WAITING(w@/!)` keeps a
+// note going in and a timestamp coming out. Neither was trimmed, so the keyword
+// stayed `NEXT(n!)` - and since keywords are recognised on a headline by literal
+// prefix, `* NEXT Write the thing` matched nothing and came out as a heading with
+// no keyword at all, titled "NEXT Write the thing". It was not a task, could not
+// be found by its keyword and never reached an agenda. Every file using the
+// notation the org manual documents was affected.
 func trimFastTags(tags []string) []string {
 	trimmedTags := make([]string, len(tags))
 	for i, t := range tags {
-		lParen := strings.LastIndex(t, "(")
-		rParen := strings.LastIndex(t, ")")
-		end := len(t) - 1
-		if lParen == end-2 && rParen == end {
-			trimmedTags[i] = t[:end-2]
-		} else {
-			trimmedTags[i] = t
+		trimmedTags[i] = t
+		if !strings.HasSuffix(t, ")") {
+			continue
+		}
+		// `> 0` rather than `>= 0`: a word that is nothing but a cookie has no
+		// keyword to be left with, and emptying it would make every headline
+		// match it.
+		if lParen := strings.LastIndex(t, "("); lParen > 0 {
+			trimmedTags[i] = t[:lParen]
 		}
 	}
 	return trimmedTags

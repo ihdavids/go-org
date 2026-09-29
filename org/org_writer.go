@@ -270,8 +270,27 @@ func (w *OrgWriter) WriteSDC(s SDC) {
 	if w.IsAfterNewline() {
 		w.WriteIndent()
 	}
-	w.WriteString(fmt.Sprintf("%s: %s\n", name, s.Date.ToString()))
+	w.WriteString(fmt.Sprintf("%s: %s", name, s.Date.ToString()))
+	// The rest of the planning written on this line. Org keeps a heading's
+	// planning on one line and splitting it here would reformat every done
+	// heading in the file the first time anything rewrote it.
+	for _, o := range s.Others {
+		w.WriteString(fmt.Sprintf(" %s: %s", sdcKeyword(o.DateType), o.Date.ToString()))
+	}
+	w.WriteString("\n")
 	w.SetLineBreak()
+}
+
+func sdcKeyword(dt DateType) string {
+	switch dt {
+	case Scheduled:
+		return "SCHEDULED"
+	case Deadline:
+		return "DEADLINE"
+	case Closed:
+		return "CLOSED"
+	}
+	return ""
 }
 
 func (w *OrgWriter) WriteClock(s Clock) {

@@ -414,13 +414,13 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 	case "headline":
 		consumed, node = d.parseHeadline(i, stop)
 	case "deadline":
-		consumed, node = d.parseDeadline(i, stop)
+		consumed, node = d.parsePlanning(i, stop)
 	case "scheduled":
-		consumed, node = d.parseScheduled(i, stop)
+		consumed, node = d.parsePlanning(i, stop)
 	case "clock":
 		consumed, node = d.parseClock(i, stop)
 	case "closed":
-		consumed, node = d.parseClosed(i, stop)
+		consumed, node = d.parsePlanning(i, stop)
 	case "footnoteDefinition":
 		consumed, node = d.parseFootnoteDefinition(i, stop)
 	}
