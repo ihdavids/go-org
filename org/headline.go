@@ -104,10 +104,6 @@ func reMatchParams(re *regexp.Regexp, m []string) (paramsMap map[string]string) 
 	}
 	return paramsMap
 }
-func isHeadlineNode(d *Document, i int) bool {
-	k := d.tokens[i].kind
-	return k == "headline" || k == "scheduled" || k == "deadline" || k == "beginDrawer" || k == "beginBlock"
-}
 
 func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	d.lastKeywords = nil
@@ -178,8 +174,20 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	d.Outline.last.Hash = b64.StdEncoding.EncodeToString(tHash.Sum(nil))
 	d.Outline.lastHash.Push(tHash)
 
+	// A heading's body runs to the next heading of the same level or above, and
+	// nothing else ends it - which is how org reads a file whatever the
+	// indentation.
+	//
+	// This briefly stopped on planning lines, drawers and blocks too
+	// (isHeadlineNode), comparing their matches[1] against the level. For a
+	// headline matches[1] is the stars; for those tokens it is the indentation.
+	// So a drawer, a block or a SCHEDULED line written in column zero - which
+	// is what Emacs writes since org-adapt-indentation went nil in 9.5 - ended
+	// the heading, and everything after it, child headings included, was
+	// hoisted to the top of the document with no Properties on the heading.
+	// A two-space drawer under a level-3 heading did the same.
 	stop := func(d *Document, i int) bool {
-		return parentStop(d, i) || isHeadlineNode(d, i) && len(d.tokens[i].matches[1]) <= headline.Lvl
+		return parentStop(d, i) || d.tokens[i].kind == "headline" && len(d.tokens[i].matches[1]) <= headline.Lvl
 	}
 	consumed, nodes := d.parseMany(i+1, stop)
 	// Scan the first few nodes for the PropertyDrawer.
