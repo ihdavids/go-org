@@ -89,9 +89,11 @@ func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) strin
 	var ignore = ""
 	if brtype == NoBracket {
 		ignore = `[\s\w]`
+	} else if brtype == Inactive {
+		// Not past the closing bracket: `[2026-10-01 Thu] and [x]` is one
+		// timestamp followed by text, not one long timestamp.
+		ignore = `[^\]>+:0-9-]`
 	} else {
-		//ignore = `[\s\w]`
-		//ignore = fmt.Sprintf(`[^%s+.:0-9-]`, bc)
 		ignore = `[^>+:0-9-]`
 	}
 
@@ -483,25 +485,39 @@ func ParseClock(line string) *OrgDateClock {
 	return clk
 }
 
-func lexDeadline(line string, row, col int) (token, bool) {
-	if m := OrgDateDeadline.Re.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
-		pos.Row += len(m[1])
-		return token{"deadline", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
+// A planning line is a line of nothing but planning: one or more of
+// SCHEDULED:, DEADLINE: and CLOSED:, each with its timestamp. The keyword
+// anywhere else - `We were SCHEDULED: <...> back then` - is just words, and
+// reading such a line as planning threw away everything else on it.
+var planningLineRegexp = regexp.MustCompile(`^(\s*)((SCHEDULED|DEADLINE|CLOSED):\s*[<\[][^>\]]*[>\]](--[<\[][^>\]]*[>\]])?\s*)+$`)
+
+func lexPlanning(kind string, dp *DateParser, line string, row, col int) (token, bool) {
+	pm := planningLineRegexp.FindStringSubmatch(line)
+	if pm == nil {
+		return nilToken, false
+	}
+	if m := dp.Re.FindStringSubmatch(line); m != nil {
+		indent := len(pm[1])
+		return token{kind, indent, line, m, Pos{row, col + indent}, Pos{row, col + len(line)}}, true
 	}
 	return nilToken, false
+}
+
+func lexDeadline(line string, row, col int) (token, bool) {
+	return lexPlanning("deadline", OrgDateDeadline, line, row, col)
 }
 
 func lexScheduled(line string, row, col int) (token, bool) {
-	if m := OrgDateScheduled.Re.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
-		pos.Col += len(m[1])
-		return token{"scheduled", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
-	}
-	return nilToken, false
+	return lexPlanning("scheduled", OrgDateScheduled, line, row, col)
 }
 
 func lexClock(line string, row, col int) (token, bool) {
+	// A clock line starts with CLOCK:. ClockRe leaves the keyword optional,
+	// which made any line starting with a range of inactive timestamps,
+	// [2026-10-01 Thu 10:00]--[2026-10-03 Sat 12:00], a clock entry.
+	if !strings.HasPrefix(strings.TrimSpace(line), "CLOCK:") {
+		return nilToken, false
+	}
 	if m := ClockRe.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col}
 		pos.Col += len(m[1])
@@ -511,12 +527,7 @@ func lexClock(line string, row, col int) (token, bool) {
 }
 
 func lexClosed(line string, row, col int) (token, bool) {
-	if m := OrgDateClosed.Re.FindStringSubmatch(line); m != nil {
-		pos := Pos{row, col}
-		pos.Col += len(m[1])
-		return token{"closed", len(m[1]), line, m, pos, Pos{row, col + len(m[0])}}, true
-	}
-	return nilToken, false
+	return lexPlanning("closed", OrgDateClosed, line, row, col)
 }
 
 func ParseSDC(line string) (*OrgDate, DateType) {
@@ -534,6 +545,20 @@ func ParseSDC(line string) (*OrgDate, DateType) {
 		dt = NilDate
 	}
 	return d, dt
+}
+
+// ParseTimestampPrefix parses the timestamp, active or inactive, that line
+// starts with. Unlike ParseTimestamp it does not look further along the line.
+func ParseTimestampPrefix(line string) (*OrgDate, DateType, IRegEx) {
+	for _, p := range []struct {
+		parser *DateParser
+		dt     DateType
+	}{{OrgDateActive, ActiveTimeStamp}, {OrgDateInactive, InactiveTimestamp}} {
+		if d, m := p.parser.Parse(line); d != nil && strings.HasPrefix(line, m["_fullmatch"]) {
+			return d, p.dt, m
+		}
+	}
+	return nil, NilDate, nil
 }
 
 func ParseTimestamp(line string) (*OrgDate, DateType, IRegEx) {

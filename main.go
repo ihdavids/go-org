@@ -97,7 +97,10 @@ func render(args []string) {
 	} else {
 		log.Fatal(usage)
 	}
-	d := org.New().Parse(r, path)
+	// Rendering a file from the command line may load a remote #+SETUPFILE:.
+	config := org.New()
+	config.ReadURL = org.HTTPReadURL
+	d := config.Parse(r, path)
 	write := func(w org.Writer) {
 		out, err := d.Write(w)
 		if err != nil {

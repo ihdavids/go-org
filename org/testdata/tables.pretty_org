@@ -49,11 +49,11 @@
 
 #+CAPTION: A non table that should still parse
 0--------------------1
-|   |   |
-|   |   |
-|   |   |
-|   |   |
-|   |   |
+|   |
+|   |
+|   |
+|   |
+|   |
 2--------------------3
 
 #+CAPTION: This table has no spaces

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -51,8 +52,24 @@ var tableRowRegexp = regexp.MustCompile(`^(\s*)(\|.*)`)
 
 var columnAlignAndLengthRegexp = regexp.MustCompile(`^<(l|c|r)?(\d+)?>$`)
 
+// The border of a table.el table, `+-----+-----+` (or `+=====+` under its header).
+var tableElSeparatorRegexp = regexp.MustCompile(`^(\s*)(\+[-=][-=+]*\+)\s*$`)
+
+// splitTableRow splits a table row into its cells, between the bars. Every bar
+// separates two cells, so `| a || c |` has an empty middle cell: splitting into
+// non-empty fields dropped it and moved every later cell one column left.
+func splitTableRow(content string) []string {
+	content = strings.TrimRightFunc(content, unicode.IsSpace)
+	content = strings.TrimPrefix(content, "|")
+	content = strings.TrimSuffix(content, "|")
+	return strings.Split(content, "|")
+}
+
 func lexTable(line string, row, col int) (token, bool) {
-	if m := tableSeparatorRegexp.FindStringSubmatch(line); m != nil {
+	if m := tableElSeparatorRegexp.FindStringSubmatch(line); m != nil {
+		pos := Pos{row, col + len(m[1])}
+		return token{"tableElSeparator", len(m[1]), m[2], m, pos, Pos{row, col + len(m[0])}}, true
+	} else if m := tableSeparatorRegexp.FindStringSubmatch(line); m != nil {
 		pos := Pos{row, col}
 		return token{"tableSeparator", len(m[1]), m[2], m, pos, Pos{row, col + len(m[0])}}, true
 	} else if m := tableRowRegexp.FindStringSubmatch(line); m != nil {
@@ -92,7 +109,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 	rowEndPositions := [][]Pos{}
 	for ; !parentStop(d, i); i++ {
 		if t := d.tokens[i]; t.kind == "tableRow" {
-			rawRow := strings.FieldsFunc(d.tokens[i].content, func(r rune) bool { return r == '|' })
+			rawRow := splitTableRow(d.tokens[i].content)
 			startPos := d.tokens[i].pos
 			// We do not need to do this because we are doing it below!
 			//startPos.Col += 1 // increment past separator (this is first cell)
@@ -120,7 +137,7 @@ func (d *Document) parseTable(i int, parentStop stopFn) (int, Node) {
 		}
 	}
 
-	table := &Table{nil, getColumnInfos(rawRows), separatorIndices, d.tokens[start].Pos(), nil, RowColRef{1, 1, false, false, false, false}, nil, nil, nil, d.lastKeywords}
+	table := &Table{Rows: nil, ColumnInfos: getColumnInfos(rawRows), SeparatorIndices: separatorIndices, Pos: d.tokens[start].Pos(), Cur: RowColRef{1, 1, false, false, false, false}, Keywords: d.lastKeywords}
 	d.lastKeywords = nil
 	var starts []Pos
 	var ends []Pos

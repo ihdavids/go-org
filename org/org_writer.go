@@ -111,9 +111,18 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 	if h.Priority != "" {
 		w.WriteString(" [#" + h.Priority + "]")
 	}
-	w.WriteString(" ")
-	WriteNodes(w, h.Title...)
-	if h.CheckStatus != nil {
+	if h.IsComment {
+		w.WriteString(" COMMENT")
+	}
+	if len(h.Title) != 0 {
+		w.WriteString(" ")
+		WriteNodes(w, h.Title...)
+	} else if h.Status == "" && h.Priority == "" && !h.IsComment {
+		w.WriteString(" ")
+	}
+	// A cookie read from the file is still in the title, where it was
+	// written; only one set on a heading that has none is added here.
+	if h.CheckStatus != nil && !hasStatisticToken(h.Title) {
 		w.WriteString(h.CheckStatus.String())
 	}
 	if len(h.Tags) != 0 {
@@ -138,6 +147,27 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 	w.Indent = originalIndent
 }
 
+func hasStatisticToken(nodes []Node) bool {
+	for _, n := range nodes {
+		if _, ok := n.(StatisticToken); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// blockHeader is what follows #+BEGIN_NAME: the language, the switches and the
+// header arguments, in that order.
+func blockHeader(b Block) string {
+	words, parameters := []string{}, b.Parameters
+	if len(parameters) != 0 && !strings.HasPrefix(parameters[0], ":") {
+		words, parameters = append(words, parameters[0]), parameters[1:]
+	}
+	words = append(words, b.Switches...)
+	words = append(words, parameters...)
+	return strings.Join(words, " ")
+}
+
 func (w *OrgWriter) WriteBlock(b Block) {
 	idx := w.Idx
 	w.WriteIndent()
@@ -146,8 +176,8 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	} else {
 		w.WriteString("#+BEGIN_" + b.Name)
 	}
-	if len(b.Parameters) != 0 {
-		w.WriteString(" " + strings.Join(b.Parameters, " "))
+	if header := blockHeader(b); header != "" {
+		w.WriteString(" " + header)
 	}
 	w.WriteString("\n")
 	//if isRawTextBlock(b.Name) {
@@ -189,7 +219,15 @@ func (w *OrgWriter) WriteBlock(b Block) {
 
 func (w *OrgWriter) WriteResult(r Result) {
 	w.WriteIndent()
-	w.WriteString("#+RESULTS:\n")
+	w.WriteString("#+RESULTS")
+	if r.Hash != "" {
+		w.WriteString("[" + r.Hash + "]")
+	}
+	w.WriteString(":")
+	if r.Value != "" {
+		w.WriteString(" " + r.Value)
+	}
+	w.WriteString("\n")
 	w.LastLineBreak = w.Idx - 1
 	WriteNodesLB(w.Idx, w, r.Node)
 	w.SetLineBreak()
@@ -209,6 +247,16 @@ func (w *OrgWriter) WriteInlineBlock(b InlineBlock) {
 		w.WriteString("@@" + b.Parameters[0] + ":")
 		WriteNodes(w, b.Children...)
 		w.WriteString("@@")
+	case "call":
+		name, inside, arguments, end := b.Parameters[0], b.Parameters[1], b.Parameters[2], b.Parameters[3]
+		w.WriteString("call_" + name)
+		if inside != "" {
+			w.WriteString("[" + inside + "]")
+		}
+		w.WriteString("(" + arguments + ")")
+		if end != "" {
+			w.WriteString("[" + end + "]")
+		}
 	}
 }
 
@@ -328,7 +376,11 @@ func (w *OrgWriter) WriteExample(e Example) {
 
 func (w *OrgWriter) WriteKeyword(k Keyword) {
 	w.WriteIndent()
-	w.WriteString("#+" + k.Key + ":")
+	w.WriteString("#+" + k.Key)
+	if k.Optional != "" {
+		w.WriteString("[" + k.Optional + "]")
+	}
+	w.WriteString(":")
 	if k.Value != "" {
 		w.WriteString(" " + k.Value)
 	}
@@ -341,9 +393,13 @@ func (w *OrgWriter) WriteInclude(i Include) {
 }
 
 func (w *OrgWriter) WriteNodeWithMeta(n NodeWithMeta) {
-	for _, ns := range n.Meta.Caption {
+	for i, ns := range n.Meta.Caption {
 		w.WriteIndent()
-		w.WriteString("#+CAPTION: ")
+		w.WriteString("#+CAPTION")
+		if i < len(n.Meta.ShortCaption) && n.Meta.ShortCaption[i] != nil {
+			w.WriteString("[" + w.WriteNodesAsString(n.Meta.ShortCaption[i]...) + "]")
+		}
+		w.WriteString(": ")
 		WriteNodes(w, ns...)
 		w.WriteString("\n")
 	}
@@ -377,7 +433,11 @@ func (w *OrgWriter) WriteNodeWithName(n NodeWithName) {
 
 func (w *OrgWriter) WriteComment(c Comment) {
 	w.WriteIndent()
-	w.WriteString("# " + c.Content + "\n")
+	if c.Content == "" {
+		w.WriteString("#\n")
+	} else {
+		w.WriteString("# " + c.Content + "\n")
+	}
 	w.SetLineBreak()
 }
 
@@ -502,6 +562,11 @@ func (w *OrgWriter) WriteEmphasis(e Emphasis) {
 	if w.IsAfterNewline() {
 		w.WriteIndent()
 	}
+	if e.Unbraced {
+		w.WriteString(e.Kind[:1])
+		WriteNodes(w, e.Content...)
+		return
+	}
 	w.WriteString(borders[0])
 	WriteNodes(w, e.Content...)
 	w.WriteString(borders[1])
@@ -553,13 +618,56 @@ func (w *OrgWriter) WriteRegularLink(l RegularLink) {
 	}
 	if l.AutoLink {
 		w.WriteString(l.URL)
+	} else if l.AngleLink {
+		w.WriteString("<" + l.URL + ">")
 	} else if l.Description == nil {
-		w.WriteString(fmt.Sprintf("[[%s]]", l.URL))
+		w.WriteString(fmt.Sprintf("[[%s]]", escapeLinkPath(l.URL)))
 	} else {
-		w.WriteString(fmt.Sprintf("[[%s][%s]]", l.URL, w.WriteNodesAsString(l.Description...)))
+		w.WriteString(fmt.Sprintf("[[%s][%s]]", escapeLinkPath(l.URL), w.WriteNodesAsString(l.Description...)))
 	}
 }
 
 func (w *OrgWriter) WriteMacro(m Macro) {
-	w.WriteString(fmt.Sprintf("{{{%s(%s)}}}", m.Name, strings.Join(m.Parameters, ",")))
+	if m.Parameters == nil {
+		w.WriteString(fmt.Sprintf("{{{%s}}}", m.Name))
+		return
+	}
+	arguments := make([]string, len(m.Parameters))
+	for i, p := range m.Parameters {
+		arguments[i] = strings.ReplaceAll(p, ",", `\,`)
+	}
+	w.WriteString(fmt.Sprintf("{{{%s(%s)}}}", m.Name, strings.Join(arguments, ",")))
+}
+
+func (w *OrgWriter) WriteTarget(t Target) {
+	if w.IsAfterNewline() {
+		w.WriteIndent()
+	}
+	w.WriteString("<<" + t.Name + ">>")
+}
+
+func (w *OrgWriter) WriteRadioTarget(t RadioTarget) {
+	if w.IsAfterNewline() {
+		w.WriteIndent()
+	}
+	w.WriteString("<<<" + t.Name + ">>>")
+}
+
+func (w *OrgWriter) WriteBabelCall(c BabelCall) {
+	idx := w.Idx
+	w.WriteKeyword(c.Keyword)
+	if c.Result != nil {
+		w.WriteString("\n")
+		w.LastLineBreak = idx - 1
+		WriteNodesLB(idx, w, c.Result)
+	}
+	w.SetLineBreakAs(idx)
+}
+
+func (w *OrgWriter) WriteTableEl(t TableEl) {
+	for _, line := range t.Lines {
+		w.WriteIndent()
+		w.WriteString(line + "\n")
+	}
+	w.SetLineBreak()
 }

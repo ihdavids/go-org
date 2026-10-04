@@ -158,6 +158,8 @@ func (w *HTMLWriter) WriteBlock(b Block) {
 		}
 	case "QUOTE":
 		w.WriteString("<blockquote>\n" + content + "</blockquote>\n")
+	case "COMMENT":
+		return
 	case "CENTER":
 		w.WriteString(`<div class="center-block" style="text-align: center; margin-left: auto; margin-right: auto;">` + "\n")
 		w.WriteString(content + "</div>\n")
@@ -188,6 +190,9 @@ func (w *HTMLWriter) WriteInlineBlock(b InlineBlock) {
 		if strings.ToLower(b.Parameters[0]) == "html" {
 			w.WriteString(content)
 		}
+	case "call":
+		// An inline call exports its results, which org writes after it as a
+		// {{{results(...)}}} macro; the call itself has no output of its own.
 	}
 }
 
@@ -253,7 +258,11 @@ func (w *HTMLWriter) WriteOutline(d *Document, maxLvl int) {
 }
 
 func (w *HTMLWriter) writeSection(section *Section, maxLvl int) {
-	if (maxLvl != 0 && section.Headline.Lvl > maxLvl) || section.Headline.IsExcluded(w.Document) {
+	if (maxLvl != 0 && section.Headline.Lvl > maxLvl) || section.Headline.IsExcluded(w.Document) || section.Headline.IsComment {
+		return
+	}
+	archived := section.Headline.IsArchived()
+	if archived && w.Document.GetOption("arch") == "nil" {
 		return
 	}
 	// NOTE: To satisfy hugo ExtractTOC() check we cannot use `<li>\n` here. Doesn't really matter, just a note.
@@ -264,6 +273,9 @@ func (w *HTMLWriter) writeSection(section *Section, maxLvl int) {
 	hasChildren := false
 	for _, section := range section.Children {
 		hasChildren = hasChildren || maxLvl == 0 || section.Headline.Lvl <= maxLvl
+	}
+	if archived && w.Document.GetOption("arch") != "t" {
+		hasChildren = false
 	}
 	if hasChildren {
 		w.WriteString("<ul>\n")
@@ -276,8 +288,19 @@ func (w *HTMLWriter) writeSection(section *Section, maxLvl int) {
 }
 
 func (w *HTMLWriter) WriteHeadline(h Headline) {
-	if h.IsExcluded(w.Document) {
+	// A COMMENT subtree is not exported. An archived one is exported as its
+	// heading alone, unless the arch option says otherwise: arch:t exports it
+	// all and arch:nil not at all.
+	if h.IsExcluded(w.Document) || h.IsComment {
 		return
+	}
+	arch := w.Document.GetOption("arch")
+	if h.IsArchived() {
+		if arch == "nil" {
+			return
+		} else if arch != "t" {
+			h.Children = nil
+		}
 	}
 	if w.HeadlineWriterOverride != nil {
 		w.HeadlineWriterOverride.WriteHeadlineOverride(h)
@@ -430,7 +453,50 @@ func (w *HTMLWriter) WriteClock(s Clock) {
 	w.WriteString(`</span>`)
 }
 
+// targetID is the id of the anchor written for a <<target>>.
+func targetID(name string) string {
+	id := strings.Builder{}
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' {
+			id.WriteRune(r)
+		} else {
+			id.WriteRune('-')
+		}
+	}
+	return "target-" + id.String()
+}
+
+func (w *HTMLWriter) WriteTarget(t Target) {
+	w.WriteString(fmt.Sprintf(`<a id="%s"></a>`, html.EscapeString(targetID(t.Name))))
+}
+
+func (w *HTMLWriter) WriteRadioTarget(t RadioTarget) {
+	w.WriteString(fmt.Sprintf(`<a id="%s">`, html.EscapeString(targetID(t.Name))))
+	WriteNodes(w, t.Children...)
+	w.WriteString("</a>")
+}
+
+func (w *HTMLWriter) WriteBabelCall(c BabelCall) {
+	headers := c.InsideHeader + " " + c.EndHeader
+	if c.Result != nil && !strings.Contains(headers, ":exports none") && !strings.Contains(headers, ":exports code") {
+		WriteNodes(w, c.Result)
+	}
+}
+
+func (w *HTMLWriter) WriteTableEl(t TableEl) {
+	w.WriteString(t.html())
+}
+
 func (w *HTMLWriter) WriteRegularLink(l RegularLink) {
+	// [[name]] where name is a <<target>> of the document links to it.
+	if l.Protocol == "" && w.Document.Targets[l.URL] {
+		description := html.EscapeString(l.URL)
+		if l.Description != nil {
+			description = w.WriteNodesAsString(l.Description...)
+		}
+		w.WriteString(fmt.Sprintf(`<a href="#%s">%s</a>`, html.EscapeString(targetID(l.URL)), description))
+		return
+	}
 	url := html.EscapeString(l.URL)
 	if l.Protocol == "file" {
 		url = url[len("file:"):]
@@ -478,14 +544,46 @@ func (w *HTMLWriter) WriteRegularLink(l RegularLink) {
 	}
 }
 
+// builtinMacro expands the macros org defines itself, when the document does
+// not define one of the same name.
+func (w *HTMLWriter) builtinMacro(m Macro) (string, bool) {
+	argument := func(i int) string {
+		if i < len(m.Parameters) {
+			return strings.TrimSpace(m.Parameters[i])
+		}
+		return ""
+	}
+	switch strings.ToLower(m.Name) {
+	case "title", "author", "email", "date":
+		return w.Document.Get(strings.ToUpper(m.Name)), true
+	case "keyword":
+		return w.Document.Get(strings.ToUpper(argument(0))), true
+	case "results":
+		return argument(0), true
+	}
+	return "", false
+}
+
 func (w *HTMLWriter) WriteMacro(m Macro) {
-	if macro := w.Document.Macros[m.Name]; macro != "" {
+	macro, defined := w.Document.Macros[m.Name]
+	if !defined {
+		macro, _ = w.builtinMacro(m)
+	}
+	if macro != "" {
 		for i, param := range m.Parameters {
 			macro = strings.Replace(macro, fmt.Sprintf("$%d", i+1), param, -1)
 		}
 		macroDocument := w.Document.Parse(strings.NewReader(macro), w.Document.Path)
 		if macroDocument.Error != nil {
 			w.log.Printf("bad macro: %s -> %s: %v", m.Name, macro, macroDocument.Error)
+		}
+		// A macro is expanded where it stands, inside its paragraph: an
+		// expansion that is a single paragraph is written as its contents.
+		if len(macroDocument.Nodes) == 1 {
+			if p, ok := macroDocument.Nodes[0].(Paragraph); ok {
+				WriteNodes(w, p.Children...)
+				return
+			}
 		}
 		WriteNodes(w, macroDocument.Nodes...)
 	}

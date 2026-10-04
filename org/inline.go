@@ -63,6 +63,9 @@ type Emphasis struct {
 	EndPos  Pos
 	Kind    string
 	Content []Node
+	// Unbraced marks a subscript or superscript written without braces, H_2O
+	// rather than H_{2}O. Its Kind is still "_{}" or "^{}".
+	Unbraced bool
 }
 
 type InlineBlock struct {
@@ -94,27 +97,58 @@ type RegularLink struct {
 	Description []Node
 	URL         string
 	AutoLink    bool
+	AngleLink   bool // written <protocol:path>
+}
+
+// Target is a dedicated target, <<name>>, which [[name]] links to.
+type Target struct {
+	Pos    Pos
+	EndPos Pos
+	Name   string
+}
+
+// RadioTarget is a radio target, <<<name>>>.
+type RadioTarget struct {
+	Pos      Pos
+	EndPos   Pos
+	Name     string
+	Children []Node
 }
 
 type Macro struct {
 	Pos        Pos
 	Name       string
-	Parameters []string
+	Parameters []string // nil for a macro written without parentheses, {{{name}}}
 }
 
 var validURLCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:/?#[]@!$&'()*+,;="
-var autolinkProtocols = regexp.MustCompile(`^(https?|ftp|file)$`)
+
+// The link types recognised in plain text, `see https://... or mailto:...`.
+var autolinkProtocols = regexp.MustCompile(`^(https?|ftps?|file|mailto|news|doi|irc|ssh|sftp|tel)$`)
+
+// The link types recognised in an angle link, <protocol:path>.
+var angleLinkProtocols = regexp.MustCompile(`^(https?|ftps?|file|mailto|news|doi|irc|ssh|sftp|tel|id|attachment|info|help|man|shell|elisp|bibtex|docview|gnus|rmail|mhe|bbdb)$`)
+var angleLinkRegexp = regexp.MustCompile(`^<([a-zA-Z][a-zA-Z0-9+.-]*):([^\s<>\[\]](?:[^<>\[\]\n]*[^\s<>\[\]])?)>`)
+var targetRegexp = regexp.MustCompile(`^<<([^<>\s](?:[^<>\n]*[^<>\s])?)>>`)
+var radioTargetRegexp = regexp.MustCompile(`^<<<([^<>\s](?:[^<>\n]*[^<>\s])?)>>>`)
 var imageExtensionRegexp = regexp.MustCompile(`^[.](png|gif|jpe?g|svg|tiff?)$`)
 var videoExtensionRegexp = regexp.MustCompile(`^[.](webm|mp4)$`)
 
 var subScriptSuperScriptRegexp = regexp.MustCompile(`^([_^]){([^{}]+?)}`)
 var timestampRegexp = regexp.MustCompile(`^<(\d{4}-\d{2}-\d{2})( [A-Za-z]+)?( \d{2}:\d{2})?( \+\d+[dwmy])?>`)
-var footnoteRegexp = regexp.MustCompile(`^\[fn:([\w-]*?)(:(.*?))?\]`)
-var statisticsTokenRegexp = regexp.MustCompile(`^\[(\d+/\d+|\d+%)\]`)
-var latexFragmentRegexp = regexp.MustCompile(`(?s)^\\begin{(\w+)}(.*)\\end{(\w+)}`)
-var inlineBlockRegexp = regexp.MustCompile(`src_(\w+)(\[(.*)\])?{(.*)}`)
+var footnoteRegexp = regexp.MustCompile(`^\[fn:([\w-]*)[:\]]`)
+
+// [1/3], [33%], and the empty cookies [/] and [%] that org fills in.
+var statisticsTokenRegexp = regexp.MustCompile(`^\[(\d*/\d*|\d*%)\]`)
+var latexEnvironmentBeginRegexp = regexp.MustCompile(`^\\begin\{([A-Za-z0-9*]+)\}`)
 var inlineExportBlockRegexp = regexp.MustCompile(`@@(\w+):(.*?)@@`)
-var macroRegexp = regexp.MustCompile(`{{{(.*)\((.*)\)}}}`)
+
+// {{{name}}} or {{{name(arguments)}}} - the arguments end at the first )}}},
+// so that two macros on one line are two macros.
+var macroRegexp = regexp.MustCompile(`^\{\{\{([a-zA-Z][-\w]*)(?:\(((?s:.*?))\))?\}\}\}`)
+
+// An unbraced subscript or superscript: a_b, x^2, H_2O, e^-1, a_*.
+var unbracedSubScriptSuperScriptRegexp = regexp.MustCompile(`^([_^])(\*|[+-]?[\pL\pN.,\\]*[\pL\pN])`)
 
 var timestampFormat = "2006-01-02 Mon 15:04"
 var datestampFormat = "2006-01-02 Mon"
@@ -148,7 +182,9 @@ func (d *Document) parseInline(input string, i int) (nodes []Node) {
 		case '{':
 			consumed, node = d.parseMacro(input, current, i)
 		case '<':
-			consumed, node = d.parseTimestamp(input, current, i)
+			consumed, node = d.parseOpeningAngle(input, current, i)
+		case 'c':
+			consumed, node = d.parseInlineBabelCall(input, current, i)
 		case '\\':
 			consumed, node = d.parseExplicitLineBreakOrLatexFragment(input, current, i)
 		case '$':
@@ -227,12 +263,107 @@ func (d *Document) parseInlineBlock(input string, start int, ni int) (int, int, 
 	if !(strings.HasSuffix(input[:start], "src") && (start-4 < 0 || unicode.IsSpace(rune(input[start-4])))) {
 		return 0, 0, nil
 	}
-	if m := inlineBlockRegexp.FindStringSubmatch(input[start-3:]); m != nil {
-		temp := d.lastKeywords
-		d.lastKeywords = nil
-		return 3, len(m[0]), InlineBlock{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, start + len(m[0])}, "src", strings.Fields(m[1] + " " + m[3]), d.parseRawInline(m[4], ni), temp}
+	// src_LANG[HEADERS]{BODY}: the headers and the body each end at their
+	// matching bracket on the same line, not at the last one on the line.
+	rest, i := input[start+1:], 0
+	for i < len(rest) && !unicode.IsSpace(rune(rest[i])) && !strings.ContainsRune("[]{}", rune(rest[i])) {
+		i++
 	}
-	return 0, 0, nil
+	lang := rest[:i]
+	if lang == "" {
+		return 0, 0, nil
+	}
+	headers := ""
+	if i < len(rest) && rest[i] == '[' {
+		end := matchingBracket(rest, i, '[', ']')
+		if end < 0 {
+			return 0, 0, nil
+		}
+		headers, i = rest[i+1:end], end+1
+	}
+	if i >= len(rest) || rest[i] != '{' {
+		return 0, 0, nil
+	}
+	end := matchingBracket(rest, i, '{', '}')
+	if end < 0 {
+		return 0, 0, nil
+	}
+	body := rest[i+1 : end]
+	length := 3 + 1 + end + 1 // src, _, through the closing brace
+	temp := d.lastKeywords
+	d.lastKeywords = nil
+	row := d.tokens[ni].Pos().Row
+	return 3, length, InlineBlock{Pos{row, start - 3}, Pos{row, start - 3 + length}, "src", strings.Fields(lang + " " + headers), d.parseRawInline(body, ni), temp}
+}
+
+// matchingBracket returns the index of the bracket closing the one at
+// s[open], counting nested pairs and stopping at the end of the line; -1 if
+// there is none.
+func matchingBracket(s string, open int, opening, closing byte) int {
+	depth := 0
+	for i := open; i < len(s); i++ {
+		switch s[i] {
+		case '\n':
+			return -1
+		case opening:
+			depth++
+		case closing:
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// parseInlineBabelCall reads call_NAME[INSIDE](ARGUMENTS)[END] - an inline
+// babel call - into an InlineBlock named "call", with the parameters name,
+// inside header, arguments and end header.
+func (d *Document) parseInlineBabelCall(input string, start int, ni int) (int, Node) {
+	if !strings.HasPrefix(input[start:], "call_") {
+		return 0, nil
+	}
+	if start > 0 {
+		if r, _ := utf8.DecodeLastRuneInString(input[:start]); unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
+			return 0, nil
+		}
+	}
+	rest, i := input[start+len("call_"):], 0
+	for i < len(rest) && !unicode.IsSpace(rune(rest[i])) && !strings.ContainsRune("[]()", rune(rest[i])) {
+		i++
+	}
+	name := rest[:i]
+	if name == "" {
+		return 0, nil
+	}
+	inside, end := "", ""
+	if i < len(rest) && rest[i] == '[' {
+		e := matchingBracket(rest, i, '[', ']')
+		if e < 0 {
+			return 0, nil
+		}
+		inside, i = rest[i+1:e], e+1
+	}
+	if i >= len(rest) || rest[i] != '(' {
+		return 0, nil
+	}
+	e := matchingBracket(rest, i, '(', ')')
+	if e < 0 {
+		return 0, nil
+	}
+	arguments := rest[i+1 : e]
+	i = e + 1
+	if i < len(rest) && rest[i] == '[' {
+		e := matchingBracket(rest, i, '[', ']')
+		if e < 0 {
+			return 0, nil
+		}
+		end, i = rest[i+1:e], e+1
+	}
+	length := len("call_") + i
+	row := d.tokens[ni].Pos().Row
+	return length, InlineBlock{Pos: Pos{row, start}, EndPos: Pos{row, start + length}, Name: "call", Parameters: []string{name, inside, arguments, end}}
 }
 
 func (d *Document) parseInlineExportBlock(input string, start int, ni int) (int, Node) {
@@ -256,11 +387,13 @@ func (d *Document) parseExplicitLineBreakOrLatexFragment(input string, start int
 	case input[start+1] == '(' || input[start+1] == '[':
 		return d.parseLatexFragment(input, start, 2, ni)
 	case strings.Index(input[start:], `\begin{`) == 0:
-		if m := latexFragmentRegexp.FindStringSubmatch(input[start:]); m != nil {
-			if open, content, close := m[1], m[2], m[3]; open == close {
-				openingPair, closingPair := `\begin{`+open+`}`, `\end{`+close+`}`
-				i := strings.Index(input[start:], closingPair)
-				return i + len(closingPair), LatexFragment{Pos{d.tokens[ni].Pos().Row, start}, openingPair, closingPair, d.parseRawInline(content, ni)}
+		// \begin{name} ... \end{name}, closed by the first \end of the same
+		// name. Names such as align* are names too.
+		if m := latexEnvironmentBeginRegexp.FindStringSubmatch(input[start:]); m != nil {
+			openingPair, closingPair := m[0], `\end{`+m[1]+`}`
+			if i := strings.Index(input[start+len(openingPair):], closingPair); i >= 0 {
+				content := input[start+len(openingPair) : start+len(openingPair)+i]
+				return len(openingPair) + i + len(closingPair), LatexFragment{Pos{d.tokens[ni].Pos().Row, start}, openingPair, closingPair, d.parseRawInline(content, ni)}
 			}
 		}
 	}
@@ -283,11 +416,60 @@ func (d *Document) parseLatexFragment(input string, start int, pairLength int, n
 	return 0, nil
 }
 
+// subSuperscriptOption is the ^ export option: t reads a_b and a^b as
+// subscript and superscript, {} only the braced a_{b} and a^{b}, and nil
+// neither. The default is {} - unlike Emacs, where it is t - so that the
+// snake_case names and file_names.txt common in prose are left alone unless a
+// document asks for #+OPTIONS: ^:t.
+func (d *Document) subSuperscriptOption() string {
+	for _, settings := range []map[string]string{d.BufferSettings, d.DefaultSettings} {
+		value := ""
+		for _, field := range strings.Fields(settings["OPTIONS"]) {
+			if strings.HasPrefix(field, "^:") {
+				value = field[2:]
+			}
+		}
+		if value != "" {
+			return value
+		}
+	}
+	return "{}"
+}
+
 func (d *Document) parseSubOrSuperScript(input string, start int, ni int) (int, Node) {
+	consumed, node := d.parseBracedSubOrSuperScript(input, start, ni)
+	if consumed == 0 {
+		consumed, node = d.parseUnbracedSubOrSuperScript(input, start, ni)
+	}
+	return consumed, node
+}
+
+func (d *Document) parseBracedSubOrSuperScript(input string, start int, ni int) (int, Node) {
+	if d.subSuperscriptOption() == "nil" {
+		return 0, nil
+	}
 	if m := subScriptSuperScriptRegexp.FindStringSubmatch(input[start:]); m != nil {
 		fullLen := len(m[2]) + 3
 		startRow := d.tokens[ni].Pos().Row
-		return fullLen, Emphasis{Pos{startRow, start}, Pos{startRow, start + fullLen}, m[1] + "{}", []Node{Text{Pos{startRow, start}, computeTextEnd(Pos{startRow, start}, m[2]), m[2], false}}}
+		return fullLen, Emphasis{Pos{startRow, start}, Pos{startRow, start + fullLen}, m[1] + "{}", []Node{Text{Pos{startRow, start}, computeTextEnd(Pos{startRow, start}, m[2]), m[2], false}}, false}
+	}
+	return 0, nil
+}
+
+// An unbraced subscript or superscript follows a character that is not a space:
+// H_2O, x^2. It is the same Emphasis as the braced form, marked Unbraced so that
+// it is written back the way it was written.
+func (d *Document) parseUnbracedSubOrSuperScript(input string, start int, ni int) (int, Node) {
+	if start == 0 || d.subSuperscriptOption() != "t" {
+		return 0, nil
+	}
+	if r, _ := utf8.DecodeLastRuneInString(input[:start]); unicode.IsSpace(r) {
+		return 0, nil
+	}
+	if m := unbracedSubScriptSuperScriptRegexp.FindStringSubmatch(input[start:]); m != nil {
+		startRow := d.tokens[ni].Pos().Row
+		fullLen := len(m[0])
+		return fullLen, Emphasis{Pos{startRow, start}, Pos{startRow, start + fullLen}, m[1] + "{}", []Node{Text{Pos{startRow, start + 1}, computeTextEnd(Pos{startRow, start + 1}, m[2]), m[2], false}}, true}
 	}
 	return 0, nil
 }
@@ -295,10 +477,12 @@ func (d *Document) parseSubOrSuperScript(input string, start int, ni int) (int, 
 func (d *Document) parseSubScriptOrEmphasisOrInlineBlock(input string, start int, ni int) (int, int, Node) {
 	if rewind, consumed, node := d.parseInlineBlock(input, start, ni); consumed != 0 {
 		return rewind, consumed, node
-	} else if consumed, node := d.parseSubOrSuperScript(input, start, ni); consumed != 0 {
+	} else if consumed, node := d.parseBracedSubOrSuperScript(input, start, ni); consumed != 0 {
+		return 0, consumed, node
+	} else if consumed, node := d.parseEmphasis(input, start, false, ni); consumed != 0 {
 		return 0, consumed, node
 	}
-	consumed, node := d.parseEmphasis(input, start, false, ni)
+	consumed, node := d.parseUnbracedSubOrSuperScript(input, start, ni)
 	return 0, consumed, node
 }
 
@@ -307,42 +491,87 @@ func (d *Document) parseOpeningBracket(input string, start int, ni int) (int, No
 		return d.parseRegularLink(input, start, ni)
 	} else if footnoteRegexp.MatchString(input[start:]) {
 		return d.parseFootnoteReference(input, start, ni)
-	} else if statisticsTokenRegexp.MatchString(input[start:]) {
+	} else if len(input[start:]) > 1 && input[start+1] >= '0' && input[start+1] <= '9' {
+		// An inactive timestamp, [2026-10-01 Thu], is as much a timestamp as
+		// an active one - it is just not one the agenda shows.
+		if consumed, node := d.parseTimestamp(input, start, ni); consumed != 0 {
+			return consumed, node
+		}
+	}
+	if statisticsTokenRegexp.MatchString(input[start:]) {
 		return d.parseStatisticToken(input, start, ni)
 	}
 	return 0, nil
 }
 
 func (d *Document) parseMacro(input string, start int, ni int) (int, Node) {
-	if m := macroRegexp.FindStringSubmatch(input[start:]); m != nil {
-		return len(m[0]), Macro{Pos{d.tokens[ni].Pos().Row, start}, m[1], strings.Split(m[2], ",")}
+	if m := macroRegexp.FindStringSubmatchIndex(input[start:]); m != nil {
+		name := input[start+m[2] : start+m[3]]
+		var parameters []string
+		if m[4] >= 0 {
+			parameters = splitMacroArguments(input[start+m[4] : start+m[5]])
+		}
+		return m[1], Macro{Pos{d.tokens[ni].Pos().Row, start}, name, parameters}
 	}
 	return 0, nil
 }
 
+// splitMacroArguments splits the arguments of a macro on commas. A comma
+// escaped with a backslash, \,, is part of an argument.
+func splitMacroArguments(s string) []string {
+	arguments, current := []string{}, strings.Builder{}
+	for i := 0; i < len(s); i++ {
+		switch {
+		case s[i] == '\\' && i+1 < len(s) && s[i+1] == ',':
+			current.WriteByte(',')
+			i++
+		case s[i] == ',':
+			arguments = append(arguments, current.String())
+			current.Reset()
+		default:
+			current.WriteByte(s[i])
+		}
+	}
+	return append(arguments, current.String())
+}
+
+// parseFootnoteReference reads [fn:name], [fn:name:definition] and
+// [fn::definition]. An inline definition ends at its matching bracket, so it
+// may hold links and other bracketed markup.
 func (d *Document) parseFootnoteReference(input string, start int, ni int) (int, Node) {
-	if m := footnoteRegexp.FindStringSubmatch(input[start:]); m != nil {
-		name, definition := m[1], m[3]
+	m := footnoteRegexp.FindStringSubmatch(input[start:])
+	if m == nil {
+		return 0, nil
+	}
+	name, length := m[1], len(m[0])
+	definition := ""
+	if strings.HasSuffix(m[0], ":") {
+		end := matchingBracket(input[start:], 0, '[', ']')
+		if end < 0 {
+			return 0, nil
+		}
+		definition, length = input[start+len(m[0]):start+end], end+1
 		if name == "" && definition == "" {
 			return 0, nil
 		}
-		link := FootnoteLink{Pos{d.tokens[ni].Pos().Row, start}, name, nil}
-		if definition != "" {
-			nodes := d.parseInline(definition, ni)
-			end := d.tokens[ni].EndPos()
-			if len(nodes) > 0 {
-				end = nodes[len(nodes)-1].GetEnd()
-			}
-			link.Definition = &FootnoteDefinition{Pos{d.tokens[ni].Pos().Row, start}, name, []Node{Paragraph{Pos{d.tokens[ni].Pos().Row, start}, end, nodes}}, true}
-		}
-		return len(m[0]), link
+	} else if name == "" {
+		return 0, nil
 	}
-	return 0, nil
+	link := FootnoteLink{Pos{d.tokens[ni].Pos().Row, start}, name, nil}
+	if definition != "" {
+		nodes := d.parseInline(definition, ni)
+		end := d.tokens[ni].EndPos()
+		if len(nodes) > 0 {
+			end = nodes[len(nodes)-1].GetEnd()
+		}
+		link.Definition = &FootnoteDefinition{Pos{d.tokens[ni].Pos().Row, start}, name, []Node{Paragraph{Pos{d.tokens[ni].Pos().Row, start}, end, nodes}}, true}
+	}
+	return length, link
 }
 
 func (d *Document) parseStatisticToken(input string, start int, ni int) (int, Node) {
 	if m := statisticsTokenRegexp.FindStringSubmatch(input[start:]); m != nil {
-		fullLen := len(m[1]) + 2
+		fullLen := len(m[0])
 		startRow := d.tokens[ni].Pos().Row
 		return fullLen, StatisticToken{Pos{startRow, start}, Pos{startRow, start + fullLen}, m[1]}
 	}
@@ -350,7 +579,7 @@ func (d *Document) parseStatisticToken(input string, start int, ni int) (int, No
 }
 
 func (d *Document) parseAutoLink(input string, start int, ni int) (int, int, Node) {
-	if !d.AutoLink || start == 0 || len(input[start:]) < 3 || input[start:start+3] != "://" {
+	if !d.AutoLink || start == 0 || start+1 >= len(input) {
 		return 0, 0, nil
 	}
 	protocolStart, protocol := start-1, ""
@@ -365,43 +594,143 @@ func (d *Document) parseAutoLink(input string, start int, ni int) (int, int, Nod
 	} else {
 		return 0, 0, nil
 	}
-	end := start
-	for ; end < len(input) && strings.ContainsRune(validURLCharacters, rune(input[end])); end++ {
+	end := start + 1
+	for ; end < len(input) && strings.ContainsRune(plainLinkCharacters, rune(input[end])); end++ {
+	}
+	// Punctuation at the end belongs to the sentence, not the link: "see
+	// https://example.org." - and so does a closing parenthesis that has
+	// no opening one in the link, "(see https://example.org)".
+	for end > start+1 {
+		c := input[end-1]
+		if strings.ContainsRune(".,;:!?'\"*=~", rune(c)) ||
+			(c == ')' && strings.Count(input[start:end], "(") < strings.Count(input[start:end], ")")) {
+			end--
+			continue
+		}
+		break
 	}
 	path := input[start:end]
-	if path == "://" {
+	if path == ":" || path == "://" {
 		return 0, 0, nil
 	}
-	return len(protocol), len(path + protocol), RegularLink{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, end}, protocol, nil, protocol + path, true}
+	return len(protocol), len(path + protocol), RegularLink{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, end}, protocol, nil, protocol + path, true, false}
 }
 
+// The characters of a plain link: those of a URL, less the brackets that would
+// end it inside a bracket link.
+var plainLinkCharacters = strings.NewReplacer("[", "", "]", "").Replace(validURLCharacters)
+
+// parseRegularLink reads [[link]] and [[link][description]]. Brackets in the
+// link are escaped with a backslash, [[file:a\]b.org]], or balanced.
 func (d *Document) parseRegularLink(input string, start int, ni int) (int, Node) {
 	input = input[start:]
 	if len(input) < 3 || input[:2] != "[[" || input[2] == '[' {
 		return 0, nil
 	}
-	end := strings.Index(input, "]]")
-	if end == -1 {
+	linkEnd, depth := -1, 0
+	for i := 2; i < len(input) && linkEnd < 0; i++ {
+		switch input[i] {
+		case '\\':
+			if i+1 < len(input) && (input[i+1] == '[' || input[i+1] == ']') {
+				i++
+			}
+		case '\n':
+			return 0, nil
+		case '[':
+			depth++
+		case ']':
+			if depth > 0 {
+				depth--
+			} else {
+				linkEnd = i
+			}
+		}
+	}
+	if linkEnd < 0 || linkEnd+1 >= len(input) {
 		return 0, nil
 	}
-	rawLinkParts := strings.Split(input[2:end], "][")
-	description, link := ([]Node)(nil), rawLinkParts[0]
-	if len(rawLinkParts) == 2 {
-		link, description = rawLinkParts[0], d.parseInline(rawLinkParts[1], ni)
+	link, description, end := unescapeLinkPath(input[2:linkEnd]), ([]Node)(nil), -1
+	switch input[linkEnd+1] {
+	case ']':
+		end = linkEnd + 2
+	case '[':
+		i := strings.Index(input[linkEnd+2:], "]]")
+		if i < 0 {
+			return 0, nil
+		}
+		// A description that is itself a link, an image [[img.png]], ends
+		// a pair of brackets later.
+		if strings.HasPrefix(input[linkEnd+2:], "[[") {
+			if j := strings.Index(input[linkEnd+2+i+2:], "]]"); j >= 0 && !strings.Contains(input[linkEnd+2:linkEnd+2+i+2+j], "\n") {
+				i += j + 2
+			}
+		}
+		description = d.parseInline(input[linkEnd+2:linkEnd+2+i], ni)
+		end = linkEnd + 2 + i + 2
+	default:
+		return 0, nil
 	}
 	if strings.ContainsRune(link, '\n') {
 		return 0, nil
 	}
-	consumed := end + 2
 	protocol, linkParts := "", strings.SplitN(link, ":", 2)
 	if len(linkParts) == 2 {
 		protocol = linkParts[0]
 	}
-	return consumed, RegularLink{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, end + 2}, protocol, description, link, false}
+	return end, RegularLink{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, start + end}, protocol, description, link, false, false}
+}
+
+func unescapeLinkPath(s string) string {
+	return strings.NewReplacer(`\[`, "[", `\]`, "]").Replace(s)
+}
+
+// escapeLinkPath escapes the brackets of a link for writing it back into
+// [[...]], unless they pair up, in which case they are read back as they are.
+func escapeLinkPath(s string) string {
+	depth := 0
+	for _, r := range s {
+		if r == '[' {
+			depth++
+		} else if r == ']' {
+			if depth--; depth < 0 {
+				break
+			}
+		}
+	}
+	if depth == 0 {
+		return s
+	}
+	return strings.NewReplacer("[", `\[`, "]", `\]`).Replace(s)
+}
+
+// parseOpeningAngle reads what may start with <: a radio target <<<name>>>, a
+// target <<name>>, an angle link <https://...> or a timestamp.
+func (d *Document) parseOpeningAngle(input string, start int, ni int) (int, Node) {
+	row := d.tokens[ni].Pos().Row
+	rest := input[start:]
+	if m := radioTargetRegexp.FindStringSubmatch(rest); m != nil {
+		d.addTarget(m[1])
+		return len(m[0]), RadioTarget{Pos{row, start}, Pos{row, start + len(m[0])}, m[1], d.parseInline(m[1], ni)}
+	}
+	if m := targetRegexp.FindStringSubmatch(rest); m != nil && !strings.HasPrefix(rest, "<<<") {
+		d.addTarget(m[1])
+		return len(m[0]), Target{Pos{row, start}, Pos{row, start + len(m[0])}, m[1]}
+	}
+	if m := angleLinkRegexp.FindStringSubmatch(rest); m != nil && angleLinkProtocols.MatchString(m[1]) {
+		return len(m[0]), RegularLink{Pos{row, start}, Pos{row, start + len(m[0])}, m[1], nil, m[1] + ":" + m[2], false, true}
+	}
+	return d.parseTimestamp(input, start, ni)
+}
+
+func (d *Document) addTarget(name string) {
+	if d.Targets == nil {
+		d.Targets = map[string]bool{}
+	}
+	d.Targets[name] = true
 }
 
 func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
-	s, _, m := ParseTimestamp(input[start:])
+	s, _, m := ParseTimestampPrefix(input[start:])
 	if s != nil {
 		startRow := d.tokens[ni].Pos().Row
 		fullLen := len(m["_fullmatch"])
@@ -412,7 +741,7 @@ func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
 		// Both halves must be the same kind (active or inactive), as org
 		// requires.
 		if rest := input[start+fullLen:]; strings.HasPrefix(rest, "--") && len(rest) > 2 && (rest[2] == '<' || rest[2] == '[') {
-			if e, _, em := ParseTimestamp(rest[2:]); e != nil && e.TimestampType == s.TimestampType && !e.Start.Before(s.Start) {
+			if e, _, em := ParseTimestampPrefix(rest[2:]); e != nil && e.TimestampType == s.TimestampType && !e.Start.Before(s.Start) {
 				// Either stamp may itself be a span of the day (10:00-11:00).
 				// The run is first start to last end; the inner two times are
 				// kept so the range writes back exactly as it was written.
@@ -430,7 +759,9 @@ func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
 			}
 		}
 		timestamp := Timestamp{Pos{startRow, start}, Pos{startRow, start + fullLen}, s /*, isDate, interval*/}
-		if d.Outline.last != nil && d.Outline.last.Headline != nil {
+		// Only an active timestamp is the heading's: an inactive one is a
+		// record of when something happened, not an appointment.
+		if s.TimestampType == Active && d.Outline.last != nil && d.Outline.last.Headline != nil {
 			d.Outline.last.Headline.Timestamp = &timestamp
 		}
 		return fullLen, timestamp
@@ -454,9 +785,9 @@ func (d *Document) parseEmphasis(input string, start int, isRaw bool, ni int) (i
 
 		if input[i] == marker && i != start+1 && hasValidPostAndBorderChars(input, i) {
 			if isRaw {
-				return i + 1 - start, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, i}, input[start : start+1], d.parseRawInline(input[start+1:i], ni)}
+				return i + 1 - start, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, i}, input[start : start+1], d.parseRawInline(input[start+1:i], ni), false}
 			}
-			return i + 1 - start, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, i}, input[start : start+1], d.parseInline(input[start+1:i], ni)}
+			return i + 1 - start, Emphasis{Pos{d.tokens[ni].Pos().Row, start}, Pos{d.tokens[ni].Pos().Row, i}, input[start : start+1], d.parseInline(input[start+1:i], ni), false}
 		}
 	}
 	return 0, nil
@@ -514,6 +845,18 @@ func (n FootnoteLink) String() string      { return orgWriter.WriteNodesAsString
 func (n RegularLink) String() string       { return orgWriter.WriteNodesAsString(n) }
 func (n Macro) String() string             { return orgWriter.WriteNodesAsString(n) }
 func (n Timestamp) String() string         { return orgWriter.WriteNodesAsString(n) }
+func (n Target) String() string            { return orgWriter.WriteNodesAsString(n) }
+func (n RadioTarget) String() string       { return orgWriter.WriteNodesAsString(n) }
+func (n Target) GetPos() Pos               { return n.Pos }
+func (n RadioTarget) GetPos() Pos          { return n.Pos }
+func (n Target) GetEnd() Pos               { return n.EndPos }
+func (n RadioTarget) GetEnd() Pos          { return n.EndPos }
+func (n Target) GetType() NodeType         { return TargetNode }
+func (n RadioTarget) GetType() NodeType    { return RadioTargetNode }
+func (n Target) GetTypeName() string       { return GetNodeTypeName(n.GetType()) }
+func (n RadioTarget) GetTypeName() string  { return GetNodeTypeName(n.GetType()) }
+func (n Target) GetChildren() []Node       { return nil }
+func (n RadioTarget) GetChildren() []Node  { return n.Children }
 func (n Text) GetPos() Pos                 { return n.Pos }
 func (n LineBreak) GetPos() Pos            { return n.Pos }
 func (n ExplicitLineBreak) GetPos() Pos    { return n.Pos }

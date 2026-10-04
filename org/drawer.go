@@ -38,6 +38,13 @@ func (d *Document) parseDrawer(i int, parentStop stopFn) (int, Node) {
 	if name == "PROPERTIES" {
 		return d.parsePropertyDrawer(i, parentStop)
 	}
+	// A drawer is only a drawer if it is closed by an :END: before the next
+	// heading. Otherwise `:smile:` on a line of its own is just text - and
+	// reading it as a drawer swallowed the rest of the section, and wrote an
+	// :END: into the file that had never been there.
+	if !d.hasDrawerEnd(i+1, parentStop) {
+		return 0, nil
+	}
 	drawer, start := &Drawer{Pos: d.tokens[i].Pos(), Name: name}, i
 	i++
 	stop := func(d *Document, i int) bool {
@@ -104,29 +111,65 @@ func (d *Document) parsePropertyDrawer(i int, parentStop stopFn) (int, Node) {
 	return i - start, drawer
 }
 
+func (d *Document) hasDrawerEnd(i int, parentStop stopFn) bool {
+	for ; i < len(d.tokens) && !parentStop(d, i); i++ {
+		switch d.tokens[i].kind {
+		case "endDrawer":
+			return true
+		case "headline":
+			return false
+		}
+	}
+	return false
+}
+
+// Get returns the value of a property. A `:KEY+:` line adds to the value of
+// KEY rather than being a property of its own - `:VAR: a` then `:VAR+: b` is
+// VAR with the value "a b" - as org reads it.
 func (d *PropertyDrawer) Get(key string) (string, bool) {
 	if d == nil {
 		return "", false
 	}
+	value, found := "", false
 	for _, kvPair := range d.Properties {
-		if kvPair[0] == key {
-			return kvPair[1], true
+		switch kvPair[0] {
+		case key:
+			value, found = kvPair[1], true
+		case key + "+":
+			if found && value != "" {
+				value += " " + kvPair[1]
+			} else {
+				value = kvPair[1]
+			}
+			found = true
 		}
 	}
-	return "", false
+	return value, found
 }
 
 func (d *PropertyDrawer) Set(key string, val string) {
 	if d == nil {
 		return
 	}
-	didAdd := false
-	for i, kvPair := range d.Properties {
-		if kvPair[0] == key {
-			d.Properties[i][1] = val
+	// Setting a property replaces it, including anything `:KEY+:` lines
+	// added to it. This used to update the property and then add it a
+	// second time as well.
+	didSet := false
+	properties := d.Properties[:0]
+	for _, kvPair := range d.Properties {
+		switch kvPair[0] {
+		case key:
+			if didSet {
+				continue
+			}
+			kvPair[1], didSet = val, true
+		case key + "+":
+			continue
 		}
+		properties = append(properties, kvPair)
 	}
-	if !didAdd {
+	d.Properties = properties
+	if !didSet {
 		d.Properties = append(d.Properties, []string{key, val})
 	}
 }
@@ -151,6 +194,7 @@ func (d *PropertyDrawer) Append(key string, val string) {
 	for i, kvPair := range d.Properties {
 		if kvPair[0] == key {
 			d.Properties[i][1] += val
+			didAdd = true
 		}
 	}
 	if !didAdd {

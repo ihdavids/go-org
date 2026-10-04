@@ -10,15 +10,20 @@ type Block struct {
 	Name       string
 	Pos        Pos
 	EndPos     Pos
-	Parameters []string
-	Children   []Node
-	Result     Node
-	Keywords   []Keyword
+	Parameters []string // the language (of a src block) or backend (of an export block), then header arguments as key, value pairs
+	// The switches of the block, `-n -r -l "(ref:%s)"` - written between the
+	// language and the header arguments, as separate words.
+	Switches []string
+	Children []Node
+	Result   Node
+	Keywords []Keyword
 }
 
 type Result struct {
-	Pos  Pos
-	Node Node
+	Pos   Pos
+	Node  Node
+	Hash  string // the hash of `#+RESULTS[hash]:`, set when org caches the result
+	Value string // what follows the colon, `#+RESULTS: name`
 }
 
 type Example struct {
@@ -27,11 +32,14 @@ type Example struct {
 }
 
 var exampleLineRegexp = regexp.MustCompile(`^(\s*):(\s(.*)|\s*$)`)
-var beginBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+BEGIN_(\w+)(.*)`)
-var endBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END_(\w+)`)
+
+// A block name is anything up to the first space: `#+BEGIN_my-block` is
+// the block my-block, ended by `#+END_my-block`.
+var beginBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+BEGIN_(\S+)(.*)`)
+var endBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END_(\S+)`)
 var beginDynBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+BEGIN\b(.*)`)
 var endDynBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END\b`)
-var resultRegexp = regexp.MustCompile(`(?i)^(\s*)#\+RESULTS:`)
+var resultRegexp = regexp.MustCompile(`(?i)^(\s*)#\+RESULTS(?:\[([^\]]*)\])?:\s*(.*)$`)
 var exampleBlockEscapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*),([ \t]*)(\*|,\*|#\+|,#\+)`)
 
 func lexBlock(line string, row, col int) (token, bool) {
@@ -72,22 +80,26 @@ func lexExample(line string, row, col int) (token, bool) {
 		return name == "SRC" || name == "EXAMPLE" || name == "EXPORT" || name == "VERSE" || name == "QUOTE" || name == "CUSTOM"
 	}
 */
-func isRawTextBlock(name string) bool { return name == "SRC" || name == "EXAMPLE" || name == "EXPORT" }
+// The contents of a raw block are text, not org: a `* line` in a COMMENT
+// block is not a heading.
+func isRawTextBlock(name string) bool {
+	return name == "SRC" || name == "EXAMPLE" || name == "EXPORT" || name == "COMMENT"
+}
 
 func (d *Document) parseBlock(i int, parentStop stopFn) (int, Node) {
 	t, start := d.tokens[i], i
 	name := t.content
-	var parameters []string
+	var parameters, switches []string
 	if name == "DYN" {
-		parameters = splitParameters(t.matches[2])
+		parameters, switches = splitParametersAndSwitches(t.matches[2])
 	} else {
-		parameters = splitParameters(t.matches[3])
+		parameters, switches = splitParametersAndSwitches(t.matches[3])
 	}
 	trim := trimIndentUpTo(d.tokens[i].lvl)
 	stop := func(d *Document, i int) bool {
 		return i >= len(d.tokens) || (d.tokens[i].kind == "endBlock" && d.tokens[i].content == name)
 	}
-	block, i := &Block{name, d.tokens[start].Pos(), d.tokens[start].EndPos(), parameters, nil, nil, d.lastKeywords}, i+1
+	block, i := &Block{Name: name, Pos: d.tokens[start].Pos(), EndPos: d.tokens[start].EndPos(), Parameters: parameters, Switches: switches, Keywords: d.lastKeywords}, i+1
 	d.lastKeywords = nil
 	if isRawTextBlock(name) {
 		rawText := ""
@@ -141,8 +153,9 @@ func (d *Document) parseResult(i int, parentStop stopFn) (int, Node) {
 	if i+1 >= len(d.tokens) {
 		return 0, nil
 	}
+	m := d.tokens[i].matches
 	consumed, node := d.parseOne(i+1, parentStop)
-	return consumed + 1, Result{d.tokens[i].Pos(), node}
+	return consumed + 1, Result{Pos: d.tokens[i].Pos(), Node: node, Hash: m[2], Value: strings.TrimSpace(m[3])}
 }
 
 func trimIndentUpTo(max int) func(string) string {
@@ -152,6 +165,59 @@ func trimIndentUpTo(max int) func(string) string {
 		}
 		return line[i:]
 	}
+}
+
+// splitParametersAndSwitches splits what follows #+BEGIN_NAME into the
+// parameters - the language or backend, then the header arguments - and the
+// switches, the words starting with - or + that come before the first header
+// argument. `python -n :results output` is the language python, the switch -n
+// and the argument :results output; read as one, the language was "python -n".
+func splitParametersAndSwitches(s string) ([]string, []string) {
+	parameters := splitParameters(s)
+	if len(parameters) == 0 || strings.HasPrefix(parameters[0], ":") {
+		return parameters, nil
+	}
+	words := splitSwitchWords(parameters[0])
+	lang, switches := "", []string{}
+	for i, w := range words {
+		if i == 0 && !strings.HasPrefix(w, "-") && !strings.HasPrefix(w, "+") {
+			lang = w
+			continue
+		}
+		switches = append(switches, w)
+	}
+	if len(switches) == 0 {
+		switches = nil
+	}
+	if lang == "" {
+		return parameters[1:], switches
+	}
+	parameters[0] = lang
+	return parameters, switches
+}
+
+// splitSwitchWords splits on spaces, keeping a quoted string - the argument of
+// -l "(ref:%s)" - as one word with its quotes.
+func splitSwitchWords(s string) []string {
+	words, current, inQuotes := []string{}, strings.Builder{}, false
+	for _, r := range s {
+		switch {
+		case r == '"':
+			inQuotes = !inQuotes
+			current.WriteRune(r)
+		case unicode.IsSpace(r) && !inQuotes:
+			if current.Len() > 0 {
+				words = append(words, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if current.Len() > 0 {
+		words = append(words, current.String())
+	}
+	return words
 }
 
 func splitParameters(s string) []string {

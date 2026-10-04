@@ -32,6 +32,12 @@ type Configuration struct {
 	DefaultSettings     map[string]string                     // Default values for settings that are overriden by setting the same key in BufferSettings.
 	Log                 *log.Logger                           // Log is used to print warnings during parsing.
 	ReadFile            func(filename string) ([]byte, error) // ReadFile is used to read e.g. #+INCLUDE files.
+	// ReadURL is used to read a #+SETUPFILE: given as an http(s) URL. It is nil
+	// by default - parsing does not reach out to the network unless asked to.
+	// Set it to HTTPReadURL to allow remote setup files.
+	ReadURL func(url string) ([]byte, error)
+
+	includeAncestors []string // the files that are including the one being parsed, to refuse include cycles
 }
 
 type HeadlineStack []*Headline
@@ -65,6 +71,7 @@ type Document struct {
 	Links           map[string]string
 	Nodes           []Node
 	NamedNodes      map[string]Node
+	Targets         map[string]bool   // the names of the <<targets>> and <<<radio targets>>> in the document
 	Outline         Outline           // Outline is a Table Of Contents for the document and contains all sections (headline + content).
 	BufferSettings  map[string]string // Settings contains all settings that were parsed from keywords.
 	Error           error
@@ -112,6 +119,11 @@ const (
 	BlockNode
 	ResultNode
 	ClockNode
+	IncludedContentNode
+	BabelCallNode
+	TargetNode
+	RadioTargetNode
+	TableElNode
 )
 
 func GetNodeTypeName(t NodeType) string {
@@ -186,6 +198,16 @@ func GetNodeTypeName(t NodeType) string {
 		return "result"
 	case ClockNode:
 		return "clock"
+	case IncludedContentNode:
+		return "includedcontent"
+	case BabelCallNode:
+		return "babelcall"
+	case TargetNode:
+		return "target"
+	case RadioTargetNode:
+		return "radiotarget"
+	case TableElNode:
+		return "tableel"
 	}
 	return "undefined"
 }
@@ -243,6 +265,9 @@ var lexFns = []lexFn{
 	lexText,
 }
 
+// The longest line the tokenizer accepts.
+const maxLineLength = 1 << 30
+
 var nilToken = token{"nil", -1, "", nil, Pos{0, 0}, Pos{0, 0}}
 var orgWriter = NewOrgWriter()
 
@@ -254,7 +279,7 @@ func New() *Configuration {
 		DefaultSettings: map[string]string{
 			"TODO":         "TODO | DONE",
 			"EXCLUDE_TAGS": "noexport",
-			"OPTIONS":      "toc:t <:t e:t f:t pri:t todo:t tags:t title:t ealb:nil",
+			"OPTIONS":      "toc:t <:t e:t f:t pri:t todo:t tags:t title:t ealb:nil arch:headline ^:{}",
 		},
 		Log:      log.New(os.Stderr, "go-org: ", 0),
 		ReadFile: ioutil.ReadFile,
@@ -336,6 +361,10 @@ func (c *Configuration) Silent() *Configuration {
 func (d *Document) tokenize(input io.Reader) {
 	d.tokens = []token{}
 	scanner := bufio.NewScanner(input)
+	// Lines are not limited to bufio's default 64KB: an org file may well
+	// carry a long line (an embedded image, a minified snippet) and refusing
+	// it made the whole document fail to parse.
+	scanner.Buffer(make([]byte, 0, 64*1024), maxLineLength)
 	lineNum := 0
 	for scanner.Scan() {
 		d.tokens = append(d.tokens, tokenize(scanner.Text(), lineNum))
@@ -395,6 +424,8 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 		consumed, node = d.parseList(i, stop)
 	case "tableRow", "tableSeparator":
 		consumed, node = d.parseTable(i, stop)
+	case "tableElSeparator":
+		consumed, node = d.parseTableEl(i, stop)
 	case "beginBlock":
 		consumed, node = d.parseBlock(i, stop)
 	case "result":

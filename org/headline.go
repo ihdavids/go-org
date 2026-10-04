@@ -58,12 +58,15 @@ func (s *CheckStatus) String() string {
 }
 
 type Headline struct {
-	Pos        Pos
-	EndPos     Pos
-	Index      int
-	Lvl        int
-	Status     string
-	Priority   string
+	Pos      Pos
+	EndPos   Pos
+	Index    int
+	Lvl      int
+	Status   string
+	Priority string
+	// IsComment is set for a `* COMMENT Heading` - a commented subtree, which
+	// is not exported. The COMMENT keyword is not part of the Title.
+	IsComment  bool
 	Properties *PropertyDrawer
 	// Scheduling timestamps
 	Scheduled   *SDC
@@ -83,8 +86,16 @@ type Headline struct {
 }
 
 var headlineRegexp = regexp.MustCompile(`^([*]+)\s+(.*)`)
-var tagRegexp = regexp.MustCompile(`(.*?)\s+(:[A-Za-z0-9_@#%:]+:\s*$)`)
-var pdoneRegexp = regexp.MustCompile(`(.*?)\s\[\s*((?P<percent>\d+)%)|((?P<a>\d+)/(?P<b>\d+))\s*\]\s*$`)
+
+// Tags are made of letters and digits of any script, `_`, `@`, `#` and `%`.
+var tagRegexp = regexp.MustCompile(`(.*?)\s+(:[\p{L}\p{N}_@#%:]+:\s*$)`)
+
+// A priority cookie is `[#A]`: an uppercase letter or a number, whatever range
+// #+PRIORITIES: sets.
+var priorityRegexp = regexp.MustCompile(`^\[#([A-Z]|[0-9]+)\](\s+|$)`)
+
+// A statistics cookie anywhere in the title: [1/3], [33%], or the empty [/] and [%].
+var pdoneRegexp = regexp.MustCompile(`\[(?:(\d*)%|(\d*)/(\d*))\]`)
 
 func lexHeadline(line string, row, col int) (token, bool) {
 	if m := headlineRegexp.FindStringSubmatch(line); m != nil {
@@ -92,17 +103,6 @@ func lexHeadline(line string, row, col int) (token, bool) {
 		return token{"headline", 0, m[2], m, pos, Pos{row, col + len(m[0])}}, true
 	}
 	return nilToken, false
-}
-
-func reMatchParams(re *regexp.Regexp, m []string) (paramsMap map[string]string) {
-
-	paramsMap = make(map[string]string)
-	for i, name := range re.SubexpNames() {
-		if i > 0 && i <= len(m) {
-			paramsMap[name] = m[i]
-		}
-	}
-	return paramsMap
 }
 
 func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
@@ -115,50 +115,47 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	d.currentHeadline.Push(headline)
 
 	text := t.content
-	todoKeywords := trimFastTags(
-		strings.FieldsFunc(d.Get("TODO"), func(r rune) bool { return unicode.IsSpace(r) || r == '|' }),
-	)
-	for _, k := range todoKeywords {
-		if strings.HasPrefix(text, k) && len(text) > len(k) && unicode.IsSpace(rune(text[len(k)])) {
+	todo, done := d.TodoKeywords()
+	for _, k := range append(todo, done...) {
+		// A keyword is a whole word: `* TODO` alone is a task with no title.
+		if strings.HasPrefix(text, k) && (len(text) == len(k) || unicode.IsSpace(rune(text[len(k)]))) {
 			headline.Status = k
-			text = text[len(k)+1:]
+			text = strings.TrimLeftFunc(text[len(k):], unicode.IsSpace)
 			break
 		}
 	}
 
-	if len(text) >= 4 && text[0:2] == "[#" && strings.Contains("ABC", text[2:3]) && text[3] == ']' {
-		headline.Priority = text[2:3]
-		text = strings.TrimSpace(text[4:])
+	if m := priorityRegexp.FindStringSubmatch(text); m != nil {
+		headline.Priority = m[1]
+		text = text[len(m[0]):]
+	}
+
+	if text == "COMMENT" || strings.HasPrefix(text, "COMMENT ") {
+		headline.IsComment = true
+		text = strings.TrimLeftFunc(text[len("COMMENT"):], unicode.IsSpace)
 	}
 
 	if m := tagRegexp.FindStringSubmatch(text); m != nil {
 		text = m[1]
-		headline.Tags = strings.FieldsFunc(m[2], func(r rune) bool { return r == ':' })
+		headline.Tags = strings.FieldsFunc(m[2], func(r rune) bool { return r == ':' || unicode.IsSpace(r) })
+	} else if m := tagRegexp.FindStringSubmatch(" " + text); m != nil && m[1] == "" {
+		// A heading that is nothing but tags, `* :tag:`.
+		text = ""
+		headline.Tags = strings.FieldsFunc(m[2], func(r rune) bool { return r == ':' || unicode.IsSpace(r) })
 	}
 
-	if m := pdoneRegexp.FindStringSubmatch(text); m != nil {
-		info := reMatchParams(pdoneRegexp, m)
-		headline.CheckStatus = new(CheckStatus)
-		if p, ok := info["precent"]; ok {
-			per, err := strconv.Atoi(p)
-			if err != nil {
-				headline.CheckStatus.Type = "%"
-				headline.CheckStatus.Num = per
-			} else {
-				headline.CheckStatus = nil
-			}
+	// The cookie stays in the title, where it was written, as a statistic
+	// token; CheckStatus is what it says. The last cookie in the title counts.
+	if ms := pdoneRegexp.FindAllStringSubmatch(text, -1); ms != nil {
+		m := ms[len(ms)-1]
+		if strings.HasSuffix(m[0], "%]") {
+			n, _ := strconv.Atoi(m[1])
+			headline.CheckStatus = &CheckStatus{Num: n, Type: "%"}
 		} else {
-			a, err := strconv.Atoi(info["a"])
-			b, err2 := strconv.Atoi(info["b"])
-			if err != nil && err2 != nil {
-				headline.CheckStatus.Type = "/"
-				headline.CheckStatus.Num = a
-				headline.CheckStatus.Den = b
-			} else {
-				headline.CheckStatus = nil
-			}
+			a, _ := strconv.Atoi(m[2])
+			b, _ := strconv.Atoi(m[3])
+			headline.CheckStatus = &CheckStatus{Num: a, Den: b, Type: "/"}
 		}
-
 	}
 
 	headline.Title = d.parseInline(text, i)
@@ -212,11 +209,19 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 			j -= 1
 			continue
 		case *Drawer:
-			headline.Drawers = append(headline.Drawers, nd)
+			// Collected below, with the rest of the heading's drawers.
+			continue
 		case *Block:
 			headline.Blocks = append(headline.Blocks, nd)
 		}
 		break
+	}
+	// Every drawer of the heading's own section, not only the first: a
+	// :LOGBOOK: is followed by :NOTES: or any other drawer just as often.
+	for _, n := range nodes {
+		if drawer, ok := n.(*Drawer); ok {
+			headline.Drawers = append(headline.Drawers, drawer)
+		}
 	}
 	headline.Children = nodes
 	d.Outline.lastHash.Pop()
@@ -398,6 +403,74 @@ func (h Headline) IsExcluded(d *Document) bool {
 		}
 	}
 	return false
+}
+
+// IsArchived reports whether the heading carries the ARCHIVE tag.
+func (h Headline) IsArchived() bool {
+	for _, tag := range h.Tags {
+		if tag == "ARCHIVE" {
+			return true
+		}
+	}
+	return false
+}
+
+// IsDone reports whether the heading's keyword is one of the done states of
+// its document - those after the `|` of a #+TODO: line.
+func (h Headline) IsDone() bool {
+	if h.Status == "" || h.Doc == nil {
+		return false
+	}
+	_, done := h.Doc.TodoKeywords()
+	for _, k := range done {
+		if k == h.Status {
+			return true
+		}
+	}
+	return false
+}
+
+// IsTodo reports whether the heading's keyword is one of the not yet done
+// states of its document.
+func (h Headline) IsTodo() bool {
+	return h.Status != "" && !h.IsDone()
+}
+
+// TodoKeywords returns the TODO keywords of the document: those still to do and
+// those that are done. They come from every #+TODO:, #+SEQ_TODO: and
+// #+TYP_TODO: line - each line is its own sequence, with the done states after
+// the `|`, or if there is no `|` the last word alone. Fast access keys and
+// logging notes, `TODO(t)` or `WAIT(w@/!)`, are not part of the keyword. With
+// no such line the defaults apply, TODO and DONE.
+func (d *Document) TodoKeywords() (todo []string, done []string) {
+	lines := []string{}
+	for _, key := range []string{"TODO", "SEQ_TODO", "TYP_TODO"} {
+		if v, ok := d.BufferSettings[key]; ok {
+			lines = append(lines, strings.Split(v, "\n")...)
+		}
+	}
+	if len(lines) == 0 {
+		lines = strings.Split(d.Get("TODO"), "\n")
+	}
+	for _, line := range lines {
+		words := strings.Fields(line)
+		bar := -1
+		for i, w := range words {
+			if w == "|" {
+				bar = i
+				break
+			}
+		}
+		var t, dn []string
+		if bar >= 0 {
+			t, dn = words[:bar], words[bar+1:]
+		} else if len(words) > 0 {
+			t, dn = words[:len(words)-1], words[len(words)-1:]
+		}
+		todo = append(todo, trimFastTags(t)...)
+		done = append(done, trimFastTags(dn)...)
+	}
+	return todo, done
 }
 
 func (parent *Section) add(current *Section) {

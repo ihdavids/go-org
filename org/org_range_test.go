@@ -21,7 +21,7 @@ func TestOrgRanges(t *testing.T) {
 	d := New().Silent().Parse(reader, path)
 	// Validate top level headings in object
 	starts := []Pos{Pos{2, 0}, Pos{8, 0}, Pos{9, 0}, Pos{16, 0}, Pos{22, 0}, Pos{26, 0}, Pos{30, 0}, Pos{34, 0}}
-	ends := []Pos{Pos{7, 33}, Pos{8, 48}, Pos{15, 90}, Pos{21, 24}, Pos{25, 31}, Pos{29, 0}, Pos{33, 5}, Pos{40, 19}}
+	ends := []Pos{Pos{7, 33}, Pos{8, 48}, Pos{15, 90}, Pos{21, 24}, Pos{25, 35}, Pos{29, 0}, Pos{33, 5}, Pos{40, 19}}
 	for idx, n := range d.Outline.Children {
 		//fmt.Printf("%v : %v : %v\n", n.Headline.GetPos(), n.Headline.GetEnd(), n.Headline.Title)
 		posValidate(t, n.Headline, starts[idx], ends[idx])
