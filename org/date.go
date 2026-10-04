@@ -262,6 +262,16 @@ type OrgDate struct {
 	TimestampType TimestampType
 	HaveTime      bool
 
+	// A range across days whose stamps are each a span of the day,
+	// <2004-08-23 Mon 10:00-11:00>--<2004-08-26 Thu 10:00-11:00>, is a
+	// meeting at the same hour each day: Start and End are the whole run
+	// (the 23rd at 10:00 to the 26th at 11:00), and these keep the two times
+	// that would otherwise be lost - where the first day's span ends and the
+	// last day's begins - so the range is written back as it was. Zero when
+	// a stamp names a single time.
+	FirstEnd  time.Time
+	LastStart time.Time
+
 	RepeatRule *rrule.RRule
 	RepeatPre  string
 	RepeatDWMY string
@@ -565,10 +575,6 @@ func (self *OrgDate) HasTime() bool {
 }
 
 func (self *OrgDate) ToDate() string {
-	end := ""
-	if !self.End.IsZero() {
-		end = " -- " + self.End.Format("2006-01-02 Mon")
-	}
 	bs, be := "", ""
 	switch self.TimestampType {
 	case Active:
@@ -577,6 +583,14 @@ func (self *OrgDate) ToDate() string {
 	case Inactive:
 		bs, be = "[", "]"
 		break
+	}
+	// A range across days is two stamps joined by --, which is the only
+	// spelling org reads as a range. This used to write " -- end" inside one
+	// pair of brackets, which org does not read as a date at all.
+	end := ""
+	if !self.End.IsZero() && !sameDay(self.Start, self.End) {
+		end = "--" + bs + self.End.Format("2006-01-02 Mon") + be
+		return bs + self.Start.Format("2006-01-02 Mon") + self.repeatSuffix() + be + end
 	}
 	// The repeater and the warning period belong on a date with no time just as
 	// much as on one with a time. This used to write only the day, so a
@@ -628,10 +642,6 @@ func (self *OrgDate) ToString() string {
 	if !self.HasTime() {
 		return self.ToDate()
 	}
-	end := ""
-	if !self.End.IsZero() {
-		end = " -- " + self.End.Format("2006-01-02 Mon 15:04")
-	}
 	bs, be := "", ""
 	switch self.TimestampType {
 	case Active:
@@ -641,10 +651,36 @@ func (self *OrgDate) ToString() string {
 		bs, be = "[", "]"
 		break
 	}
+	// Org has two spellings of a range: a time span within a day,
+	// <2026-10-14 Wed 10:00-12:00>, and a span across days,
+	// <2026-10-14 Wed 10:00>--<2026-10-16 Fri 12:00>. This used to write
+	// " -- end" inside one pair of brackets, which is neither.
+	end := ""
+	if !self.End.IsZero() {
+		if sameDay(self.Start, self.End) {
+			end = "-" + self.End.Format("15:04")
+		} else {
+			first := self.Start.Format("2006-01-02 Mon 15:04")
+			if !self.FirstEnd.IsZero() {
+				first += "-" + self.FirstEnd.Format("15:04")
+			}
+			last := self.End.Format("2006-01-02 Mon 15:04")
+			if !self.LastStart.IsZero() {
+				last = self.LastStart.Format("2006-01-02 Mon 15:04") + "-" + self.End.Format("15:04")
+			}
+			return bs + first + self.repeatSuffix() + be + "--" + bs + last + be
+		}
+	}
 	// The warning interval used to be written into intNum, which is the
 	// repeater's number: a date carrying both came out with the repeat's
 	// interval printed twice and the warning's not at all.
-	return bs + self.Start.Format("2006-01-02 Mon 15:04") + self.repeatSuffix() + end + be
+	return bs + self.Start.Format("2006-01-02 Mon 15:04") + end + self.repeatSuffix() + be
+}
+
+func sameDay(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
 }
 
 func (self *OrgDate) ToClockString() string {

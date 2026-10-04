@@ -405,6 +405,30 @@ func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
 	if s != nil {
 		startRow := d.tokens[ni].Pos().Row
 		fullLen := len(m["_fullmatch"])
+		// A range across days, <2026-10-14 Wed>--<2026-10-16 Fri>, is one
+		// timestamp with an end, not two timestamps with "--" between them.
+		// Read as two, the heading kept the second as its timestamp, so a
+		// range reported its last day as its start and had no end at all.
+		// Both halves must be the same kind (active or inactive), as org
+		// requires.
+		if rest := input[start+fullLen:]; strings.HasPrefix(rest, "--") && len(rest) > 2 && (rest[2] == '<' || rest[2] == '[') {
+			if e, _, em := ParseTimestamp(rest[2:]); e != nil && e.TimestampType == s.TimestampType && !e.Start.Before(s.Start) {
+				// Either stamp may itself be a span of the day (10:00-11:00).
+				// The run is first start to last end; the inner two times are
+				// kept so the range writes back exactly as it was written.
+				if s.HasEnd() {
+					s.FirstEnd = s.End
+				}
+				if e.HasEnd() {
+					s.LastStart = e.Start
+					s.End = e.End
+				} else {
+					s.End = e.Start
+				}
+				s.HaveTime = s.HaveTime || e.HaveTime
+				fullLen += 2 + len(em["_fullmatch"])
+			}
+		}
 		timestamp := Timestamp{Pos{startRow, start}, Pos{startRow, start + fullLen}, s /*, isDate, interval*/}
 		if d.Outline.last != nil && d.Outline.last.Headline != nil {
 			d.Outline.last.Headline.Timestamp = &timestamp

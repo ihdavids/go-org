@@ -363,15 +363,12 @@ func (w *HTMLWriter) WriteTimestamp(t Timestamp) {
 		return
 	}
 	w.WriteString(`<span class="timestamp">`)
-	bs, be := "", ""
-	if t.Time.TimestampType == Active {
-		bs, be = "&lt;", "&gt;"
-	} else if t.Time.TimestampType == Inactive {
-		bs, be = "&lsqb;", "&rsqb;"
-	}
-	var od OrgDate = *t.Time
-	od.TimestampType = NoBracket
-	w.WriteString(fmt.Sprintf("%s%s%s</span>", bs, od.ToString(), be))
+	// Written the way org writes it, brackets and all, then escaped. A range
+	// across days is two bracketed stamps joined by --; bracketing the whole
+	// thing once printed <2004-08-23 Mon--2004-08-26 Thu>.
+	text := t.Time.ToString()
+	text = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "[", "&lsqb;", "]", "&rsqb;").Replace(text)
+	w.WriteString(fmt.Sprintf("%s</span>", text))
 	/*
 		if t.IsDate {
 			w.WriteString(t.Time.Format(datestampFormat))
