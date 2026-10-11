@@ -47,6 +47,8 @@ func (d *Document) parseDrawer(i int, parentStop stopFn) (int, Node) {
 	}
 	drawer, start := &Drawer{Pos: d.tokens[i].Pos(), Name: name}, i
 	i++
+	d.inDrawer++
+	defer func() { d.inDrawer-- }()
 	stop := func(d *Document, i int) bool {
 		if parentStop(d, i) {
 			return true

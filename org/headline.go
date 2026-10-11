@@ -72,7 +72,15 @@ type Headline struct {
 	Scheduled   *SDC
 	Closed      *SDC
 	Deadline    *SDC
-	Timestamp   *Timestamp
+	// The heading's active timestamp - the last one read in its headline
+	// and body, drawers included. Kept as it always was for the callers that
+	// read it; Timestamps is every one of them.
+	Timestamp *Timestamp
+	// Every active timestamp of the heading's own, in file order: its
+	// headline and its body, not a child's, not a planning line (those are
+	// Scheduled/Deadline/Closed) and not inside a drawer. Inactive stamps are
+	// records of when something happened, not appointments, and are left out.
+	Timestamps  []*Timestamp
 	Title       []Node
 	Tags        []string
 	Children    []Node

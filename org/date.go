@@ -111,7 +111,7 @@ func GenTimestampRegex(brtype TimestampType, prefix string, nocookie bool) strin
 	// documents had no scheduled date at all as far as anything reading this
 	// could tell - the planning line was re-read as body text and the heading
 	// came back with Scheduled nil.
-	var regex_cookie = `((?P<{{.prefix}}repeatpre> *[.+]{1,2})(?P<{{.prefix}}repeatnum> *\d+)(?P<{{.prefix}}repeatdwmy> *[dwmy])(/(?P<{{.prefix}}repeatmaxnum>\d+)(?P<{{.prefix}}repeatmaxdwmy>[dwmy]))?)?(({{.ignore}}+?)(?P<{{.prefix}}warnpre> *\-)(?P<{{.prefix}}warnnum> *\d+)(?P<{{.prefix}}warndwmy> *[dwmy]))?`
+	var regex_cookie = `((?P<{{.prefix}}repeatpre> *[.+]{1,2})(?P<{{.prefix}}repeatnum> *\d+)(?P<{{.prefix}}repeatdwmy> *[hdwmy])(/(?P<{{.prefix}}repeatmaxnum>\d+)(?P<{{.prefix}}repeatmaxdwmy>[dwmy]))?)?(({{.ignore}}+?)(?P<{{.prefix}}warnpre> *\-)(?P<{{.prefix}}warnnum> *\d+)(?P<{{.prefix}}warndwmy> *[dwmy]))?`
 
 	// http://www.pythonregex.com/
 	if nocookie || brtype == NoBracket {
@@ -287,6 +287,10 @@ type OrgDate struct {
 	WarnRule *rrule.RRule
 	WarnPre  string
 	WarnDWMY string
+	// The warning's number as written. A rule cannot have an interval of 0,
+	// so -0d (warn on the day itself, no earlier) used to come out as -1d,
+	// both in the agenda and when the file was written back.
+	WarnNum string
 	/*
 	   self._start = self._to_date(start)
 	   self._end = self._to_date(end)
@@ -324,6 +328,11 @@ func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 			freq := rrule.DAILY
 			var err error
 			switch repeatdwmy {
+			case "h":
+				// Org repeats by the hour too (+1h); a stamp written so
+				// used not to parse as a stamp at all.
+				freq = rrule.HOURLY
+				break
 			case "y":
 				freq = rrule.YEARLY
 				break
@@ -422,6 +431,7 @@ func (self *DateParser) Parse(line string) (*OrgDate, IRegEx) {
 			// .+ bump but change the start date to today.
 			orgDate.WarnPre = warnpre
 			orgDate.WarnDWMY = warndwmy
+			orgDate.WarnNum = strings.TrimSpace(warnnum)
 		}
 		return orgDate, match
 	}
@@ -579,16 +589,28 @@ func (self *OrgDate) OnDay(date time.Time) bool {
 	return self.Start.Day() == date.Day() && self.Start.Year() == date.Year() && self.Start.Month() == date.Month()
 }
 
+// After reports whether the date starts at or after the given time.
+//
+// The two were the wrong way round: After answered "starts at or before" and
+// Before "starts at or after", so `d.Before(t)` was true of a date *after* t.
+// Their only callers (orgs' IsOn/IsIn) are rewritten against the agenda
+// engine, so nothing depended on the inverted reading.
 func (self *OrgDate) After(date time.Time) bool {
-	return (self.Start.Before(date) || self.Start.Equal(date))
-}
-
-func (self *OrgDate) Before(date time.Time) bool {
 	return (self.Start.After(date) || self.Start.Equal(date))
 }
 
+// Before reports whether the date starts at or before the given time.
+func (self *OrgDate) Before(date time.Time) bool {
+	return (self.Start.Before(date) || self.Start.Equal(date))
+}
+
+// DateTimeInRange reports whether the time falls inside the date: from its
+// start to its end, both inclusive; a date with no end is open ended. It used
+// to read `HasEnd() ||`, which made any range contain everything after its
+// start and a date with no end contain nothing. Its one caller, HasOverlap,
+// only asks a date that has an end.
 func (self *OrgDate) DateTimeInRange(date time.Time) bool {
-	return (self.Start.Before(date) || self.Start.Equal(date)) && (self.HasEnd() || (self.End.After(date) || self.End.Equal(date)))
+	return (self.Start.Before(date) || self.Start.Equal(date)) && (!self.HasEnd() || (self.End.After(date) || self.End.Equal(date)))
 }
 
 func (self *OrgDate) HasEnd() bool {
@@ -636,18 +658,38 @@ func (self *OrgDate) ToDate() string {
 // file and "05:45+1d" for the next.
 func (self *OrgDate) repeatSuffix() string {
 	out := ""
-	if num := ruleInterval(self.RepeatRule, self.RepeatDWMY); self.RepeatDWMY != "" &&
-		self.RepeatPre != "" {
-		out += " " + strings.TrimSpace(self.RepeatPre) + num + strings.TrimSpace(self.RepeatDWMY)
-		if self.RepeatMaxNum != "" && self.RepeatMaxDWMY != "" {
-			out += "/" + self.RepeatMaxNum + self.RepeatMaxDWMY
-		}
+	if r := self.RepeatString(); r != "" {
+		out += " " + r
 	}
-	if num := ruleInterval(self.WarnRule, self.WarnDWMY); self.WarnDWMY != "" &&
-		self.WarnPre != "" {
-		out += " " + strings.TrimSpace(self.WarnPre) + num + strings.TrimSpace(self.WarnDWMY)
+	if w := self.WarnString(); w != "" {
+		out += " " + w
 	}
 	return out
+}
+
+// RepeatString is the repeater as org writes it - "+1w", ".+2d/4d", "++1m" -
+// or "" for a date that does not repeat.
+func (self *OrgDate) RepeatString() string {
+	if self == nil || self.RepeatDWMY == "" || self.RepeatPre == "" {
+		return ""
+	}
+	out := strings.TrimSpace(self.RepeatPre) + ruleInterval(self.RepeatRule, self.RepeatDWMY) + strings.TrimSpace(self.RepeatDWMY)
+	if self.RepeatMaxNum != "" && self.RepeatMaxDWMY != "" {
+		out += "/" + self.RepeatMaxNum + self.RepeatMaxDWMY
+	}
+	return out
+}
+
+// WarnString is the warning period as org writes it - "-3d", "--2w" - or "".
+func (self *OrgDate) WarnString() string {
+	if self == nil || self.WarnDWMY == "" || self.WarnPre == "" {
+		return ""
+	}
+	num := self.WarnNum
+	if num == "" {
+		num = ruleInterval(self.WarnRule, self.WarnDWMY)
+	}
+	return strings.TrimSpace(self.WarnPre) + num + strings.TrimSpace(self.WarnDWMY)
 }
 
 // ruleInterval is the number in a cookie, taken from the rule that was built for

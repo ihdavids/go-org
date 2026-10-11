@@ -762,7 +762,23 @@ func (d *Document) parseTimestamp(input string, start int, ni int) (int, Node) {
 		// Only an active timestamp is the heading's: an inactive one is a
 		// record of when something happened, not an appointment.
 		if s.TimestampType == Active && d.Outline.last != nil && d.Outline.last.Headline != nil {
-			d.Outline.last.Headline.Timestamp = &timestamp
+			h := d.Outline.last.Headline
+			h.Timestamp = &timestamp
+			// A heading with two appointments has two stamps, and keeping
+			// only the last (Timestamp) lost the first from every agenda.
+			// The same stamp read twice (a line parsed again) is kept once.
+			if d.inDrawer == 0 {
+				dup := false
+				for _, o := range h.Timestamps {
+					if o.Pos == timestamp.Pos && o.EndPos == timestamp.EndPos && o.Time.Start.Equal(s.Start) {
+						dup = true
+						break
+					}
+				}
+				if !dup {
+					h.Timestamps = append(h.Timestamps, &timestamp)
+				}
+			}
 		}
 		return fullLen, timestamp
 	}

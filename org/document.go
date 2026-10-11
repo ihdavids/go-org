@@ -77,6 +77,10 @@ type Document struct {
 	Error           error
 	currentHeadline HeadlineStack
 	lastKeywords    []Keyword // Track keywords before blocks and other items
+	// How many drawers deep the parse is. A stamp inside a drawer (a LOGBOOK
+	// note, a :NOTES: drawer) is not one of the heading's appointments, so it
+	// is left out of Headline.Timestamps.
+	inDrawer int
 }
 
 type NodeType int
