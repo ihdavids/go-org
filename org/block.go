@@ -37,8 +37,11 @@ var exampleLineRegexp = regexp.MustCompile(`^(\s*):(\s(.*)|\s*$)`)
 // the block my-block, ended by `#+END_my-block`.
 var beginBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+BEGIN_(\S+)(.*)`)
 var endBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END_(\S+)`)
-var beginDynBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+BEGIN\b(.*)`)
-var endDynBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END\b`)
+// A dynamic block is `#+BEGIN: name params` ... `#+END:`. The colon is part
+// of the keyword, not of the parameters: read as a parameter it was written
+// back as `#+BEGIN : name`, which Emacs does not see as a block at all.
+var beginDynBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+BEGIN:?(?:\s+|$)(.*)`)
+var endDynBlockRegexp = regexp.MustCompile(`(?i)^(\s*)#\+END:?(?:\s|$)`)
 var resultRegexp = regexp.MustCompile(`(?i)^(\s*)#\+RESULTS(?:\[([^\]]*)\])?:\s*(.*)$`)
 var exampleBlockEscapeRegexp = regexp.MustCompile(`(^|\n)([ \t]*),([ \t]*)(\*|,\*|#\+|,#\+)`)
 

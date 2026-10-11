@@ -167,6 +167,14 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	for _, n := range headline.Title {
 		title += n.String()
 	}
+	// An untitled heading ("** TODO" and nothing else) wrote nothing, so it
+	// took the hash of the heading before it - its parent, often - and orgs,
+	// finding a heading whose parent hash was its own, walked up the outline
+	// for ever. The marker is only written for an empty title, so no other
+	// heading's hash changes.
+	if title == "" {
+		title = "\x00untitled"
+	}
 	tHash.Write([]byte(title))
 	d.Outline.last.Hash = b64.StdEncoding.EncodeToString(tHash.Sum(nil))
 	d.Outline.lastHash.Push(tHash)

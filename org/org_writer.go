@@ -139,11 +139,31 @@ func (w *OrgWriter) WriteHeadline(h Headline) {
 	//if len(h.Children) != 0 {
 	//	w.WriteString(w.Indent)
 	//}
+	// Planning (SCHEDULED, DEADLINE, CLOSED) goes on the line under the
+	// heading, before the property drawer: org only reads it there. The
+	// parser takes the drawer out of the children and leaves the planning in
+	// them, so writing the drawer first put the planning after it, and every
+	// rewritten heading lost its dates as far as org was concerned.
+	children := h.Children
+	planned := 0
+	for planned < len(children) {
+		if _, ok := children[planned].(SDC); !ok {
+			break
+		}
+		planned++
+	}
+	if planned > 0 {
+		// Written the way the children are, so the first line knows it is at
+		// the start of one and takes the heading's indentation.
+		w.LastLineBreak = 0
+		WriteNodesLB(1, w, children[:planned]...)
+		children = children[planned:]
+	}
 	if h.Properties != nil {
 		WriteNodes(w, *h.Properties)
 	}
 	w.LastLineBreak = 0
-	WriteNodesLB(1, w, h.Children...)
+	WriteNodesLB(1, w, children...)
 	w.Indent = originalIndent
 }
 
@@ -172,7 +192,7 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	idx := w.Idx
 	w.WriteIndent()
 	if b.Name == "DYN" {
-		w.WriteString("#+BEGIN")
+		w.WriteString("#+BEGIN:")
 	} else {
 		w.WriteString("#+BEGIN_" + b.Name)
 	}
@@ -193,7 +213,13 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	content := w.WriteNodesAsString(b.Children...)
 	w.SetIndentState(true)
 	content = textwrap.Dedent(content)
-	content = textwrap.Indent(content, w.Indent+"  ", nil)
+	// A dynamic block's contents (a clock table, a column view) sit at the
+	// block's own indentation, as Emacs writes them; other blocks indent theirs.
+	if b.Name == "DYN" {
+		content = textwrap.Indent(content, w.Indent, nil)
+	} else {
+		content = textwrap.Indent(content, w.Indent+"  ", nil)
+	}
 	//w.Indent = indent
 	if b.Name == "EXAMPLE" || (b.Name == "SRC" && len(b.Parameters) >= 1 && b.Parameters[0] == "org") {
 		content = exampleBlockUnescapeRegexp.ReplaceAllString(content, "$1$2,$3")
@@ -203,7 +229,7 @@ func (w *OrgWriter) WriteBlock(b Block) {
 	w.WriteIndent()
 	//}
 	if b.Name == "DYN" {
-		w.WriteString("#+END\n")
+		w.WriteString("#+END:\n")
 	} else {
 		w.WriteString("#+END_" + b.Name + "\n")
 	}
@@ -347,7 +373,8 @@ func (w *OrgWriter) WriteClock(s Clock) {
 	hours := s.Date.DurationMins / 60
 	mins := s.Date.DurationMins % 60
 	w.WriteIndent()
-	w.WriteString(fmt.Sprintf("%s: %s => %d:%02d\n", name, s.Date.ToClockString(), hours, mins))
+	// Right-aligned in five, as Emacs writes it: `=>  1:00`, `=> 12:00`.
+	w.WriteString(fmt.Sprintf("%s: %s => %5s\n", name, s.Date.ToClockString(), fmt.Sprintf("%d:%02d", hours, mins)))
 	w.SetLineBreak()
 }
 
