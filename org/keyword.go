@@ -545,20 +545,20 @@ func (d *Document) loadSetupFile(k Keyword) (int, Node) {
 	return 1, k
 }
 
-func (n Comment) String() string      { return orgWriter.WriteNodesAsString(n) }
-func (n Keyword) String() string      { return orgWriter.WriteNodesAsString(n) }
-func (n NodeWithMeta) String() string { return orgWriter.WriteNodesAsString(n) }
-func (n NodeWithName) String() string { return orgWriter.WriteNodesAsString(n) }
-func (n Include) String() string      { return orgWriter.WriteNodesAsString(n) }
+func (n Comment) String() string      { return String(n) }
+func (n Keyword) String() string      { return String(n) }
+func (n NodeWithMeta) String() string { return String(n) }
+func (n NodeWithName) String() string { return String(n) }
+func (n Include) String() string      { return String(n) }
 
-func (n IncludedContent) String() string      { return orgWriter.WriteNodesAsString(n) }
+func (n IncludedContent) String() string      { return String(n) }
 func (n IncludedContent) GetPos() Pos         { return n.Pos }
 func (n IncludedContent) GetEnd() Pos         { return n.EndPos }
 func (n IncludedContent) GetType() NodeType   { return IncludedContentNode }
 func (n IncludedContent) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
 func (n IncludedContent) GetChildren() []Node { return n.Nodes }
 
-func (n BabelCall) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n BabelCall) String() string { return String(n) }
 func (n BabelCall) GetPos() Pos    { return n.Keyword.GetPos() }
 func (n BabelCall) GetEnd() Pos {
 	if n.Result != nil {

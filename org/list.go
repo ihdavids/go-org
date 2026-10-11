@@ -143,9 +143,9 @@ func (d *Document) parseListItem(l List, i int, parentStop stopFn) (int, Node) {
 	return i - start, ListItem{bullet, status, value, pos, nodes}
 }
 
-func (n List) String() string                { return orgWriter.WriteNodesAsString(n) }
-func (n ListItem) String() string            { return orgWriter.WriteNodesAsString(n) }
-func (n DescriptiveListItem) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n List) String() string                { return String(n) }
+func (n ListItem) String() string            { return String(n) }
+func (n DescriptiveListItem) String() string { return String(n) }
 func (self DescriptiveListItem) GetPos() Pos { return self.Pos }
 func (self ListItem) GetPos() Pos            { return self.Pos }
 func (self List) GetPos() Pos                { return self.Pos }

@@ -24,6 +24,7 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
+	"sync"
 )
 
 type Configuration struct {
@@ -273,6 +274,7 @@ var lexFns = []lexFn{
 const maxLineLength = 1 << 30
 
 var nilToken = token{"nil", -1, "", nil, Pos{0, 0}, Pos{0, 0}}
+var orgWriterMutex = sync.Mutex{}
 var orgWriter = NewOrgWriter()
 
 // New returns a new Configuration with (hopefully) sane defaults.
@@ -291,7 +293,11 @@ func New() *Configuration {
 }
 
 // String returns the pretty printed Org mode string for the given nodes (see OrgWriter).
-func String(nodes ...Node) string { return orgWriter.WriteNodesAsString(nodes...) }
+func String(nodes ...Node) string {
+	orgWriterMutex.Lock()
+	defer orgWriterMutex.Unlock()
+	return orgWriter.WriteNodesAsString(nodes...)
+}
 
 // Write is called after with an instance of the Writer interface to export a parsed Document into another format.
 func (d *Document) Write(w Writer) (out string, err error) {
@@ -463,7 +469,7 @@ func (d *Document) parseOne(i int, stop stopFn) (consumed int, node Node) {
 	if consumed != 0 {
 		return consumed, node
 	}
-	d.Log.Printf("Could not parse token %#v: Falling back to treating it as plain text.", d.tokens[i])
+	d.Log.Printf("Could not parse token %#v in file %s: Falling back to treating it as plain text.", d.tokens[i], d.Path)
 	m := plainTextRegexp.FindStringSubmatch(d.tokens[i].matches[0])
 	d.tokens[i] = token{"text", len(m[1]), m[2], m, d.tokens[i].pos, computeTextEnd(d.tokens[i].pos, m[2])}
 	return d.parseOne(i, stop)

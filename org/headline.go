@@ -509,7 +509,7 @@ func (h *Headline) AddDrawer(drawer *Drawer) {
 	h.Doc.InsertNodeAfter(newNode, h)
 }
 
-func (n Headline) String() string   { return orgWriter.WriteNodesAsString(n) }
+func (n Headline) String() string   { return String(n) }
 func (n Headline) GetPos() Pos      { return n.Pos }
 func (n Headline) GetTokenEnd() Pos { return n.EndPos }
 func (n Headline) GetEnd() Pos {
@@ -534,7 +534,7 @@ func (n Headline) GetEnd() Pos {
 		return end
 	}
 }
-func (n SDC) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n SDC) String() string { return String(n) }
 func (n SDC) GetPos() Pos    { return n.Pos }
 func (n SDC) GetEnd() Pos    { return n.EndPos }
 
@@ -543,7 +543,7 @@ func (n SDC) GetType() NodeType        { return SDCNode }
 func (n Headline) GetTypeName() string { return GetNodeTypeName(n.GetType()) }
 func (n Headline) GetType() NodeType   { return HeadlineNode }
 
-func (n Clock) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n Clock) String() string { return String(n) }
 func (n Clock) GetPos() Pos    { return n.Pos }
 func (n Clock) GetEnd() Pos    { return n.EndPos }
 

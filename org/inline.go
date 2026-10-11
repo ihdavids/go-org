@@ -131,8 +131,8 @@ var angleLinkProtocols = regexp.MustCompile(`^(https?|ftps?|file|mailto|news|doi
 var angleLinkRegexp = regexp.MustCompile(`^<([a-zA-Z][a-zA-Z0-9+.-]*):([^\s<>\[\]](?:[^<>\[\]\n]*[^\s<>\[\]])?)>`)
 var targetRegexp = regexp.MustCompile(`^<<([^<>\s](?:[^<>\n]*[^<>\s])?)>>`)
 var radioTargetRegexp = regexp.MustCompile(`^<<<([^<>\s](?:[^<>\n]*[^<>\s])?)>>>`)
-var imageExtensionRegexp = regexp.MustCompile(`^[.](png|gif|jpe?g|svg|tiff?)$`)
-var videoExtensionRegexp = regexp.MustCompile(`^[.](webm|mp4)$`)
+var imageExtensionRegexp = regexp.MustCompile(`(?i)^[.](png|gif|jpe?g|svg|tiff?|webp|x[bp]m|p[bgpn]m)$`)
+var videoExtensionRegexp = regexp.MustCompile(`(?i)^[.](webm|mp4)$`)
 
 var subScriptSuperScriptRegexp = regexp.MustCompile(`^([_^]){([^{}]+?)}`)
 var timestampRegexp = regexp.MustCompile(`^<(\d{4}-\d{2}-\d{2})( [A-Za-z]+)?( \d{2}:\d{2})?( \+\d+[dwmy])?>`)
@@ -812,19 +812,30 @@ func (d *Document) parseEmphasis(input string, start int, isRaw bool, ni int) (i
 // see org-emphasis-regexp-components (emacs elisp variable)
 
 func hasValidPreAndBorderChars(input string, i int) bool {
-	return (i+1 >= len(input) || isValidBorderChar(rune(input[i+1]))) && (i == 0 || isValidPreChar(rune(input[i-1])))
+	return isValidBorderChar(nextRune(input, i)) && isValidPreChar(prevRune(input, i))
 }
 
 func hasValidPostAndBorderChars(input string, i int) bool {
-	return (i == 0 || isValidBorderChar(rune(input[i-1]))) && (i+1 >= len(input) || isValidPostChar(rune(input[i+1])))
+	return isValidPostChar(nextRune(input, i)) && isValidBorderChar(prevRune(input, i))
+}
+
+func prevRune(input string, i int) rune {
+	r, _ := utf8.DecodeLastRuneInString(input[:i])
+	return r
+}
+
+func nextRune(input string, i int) rune {
+	_, c := utf8.DecodeRuneInString(input[i:])
+	r, _ := utf8.DecodeRuneInString(input[i+c:])
+	return r
 }
 
 func isValidPreChar(r rune) bool {
-	return unicode.IsSpace(r) || strings.ContainsRune(`-({'"`, r)
+	return r == utf8.RuneError || unicode.IsSpace(r) || strings.ContainsRune(`-({'"`, r)
 }
 
 func isValidPostChar(r rune) bool {
-	return unicode.IsSpace(r) || strings.ContainsRune(`-.,:!?;'")}[`, r)
+	return r == utf8.RuneError || unicode.IsSpace(r) || strings.ContainsRune(`-.,:!?;'")}[\`, r)
 }
 
 func isValidBorderChar(r rune) bool { return !unicode.IsSpace(r) }
@@ -850,19 +861,19 @@ func (l RegularLink) Kind() string {
 	return "regular"
 }
 
-func (n Text) String() string              { return orgWriter.WriteNodesAsString(n) }
-func (n LineBreak) String() string         { return orgWriter.WriteNodesAsString(n) }
-func (n ExplicitLineBreak) String() string { return orgWriter.WriteNodesAsString(n) }
-func (n StatisticToken) String() string    { return orgWriter.WriteNodesAsString(n) }
-func (n Emphasis) String() string          { return orgWriter.WriteNodesAsString(n) }
-func (n InlineBlock) String() string       { return orgWriter.WriteNodesAsString(n) }
-func (n LatexFragment) String() string     { return orgWriter.WriteNodesAsString(n) }
-func (n FootnoteLink) String() string      { return orgWriter.WriteNodesAsString(n) }
-func (n RegularLink) String() string       { return orgWriter.WriteNodesAsString(n) }
-func (n Macro) String() string             { return orgWriter.WriteNodesAsString(n) }
-func (n Timestamp) String() string         { return orgWriter.WriteNodesAsString(n) }
-func (n Target) String() string            { return orgWriter.WriteNodesAsString(n) }
-func (n RadioTarget) String() string       { return orgWriter.WriteNodesAsString(n) }
+func (n Text) String() string              { return String(n) }
+func (n LineBreak) String() string         { return String(n) }
+func (n ExplicitLineBreak) String() string { return String(n) }
+func (n StatisticToken) String() string    { return String(n) }
+func (n Emphasis) String() string          { return String(n) }
+func (n InlineBlock) String() string       { return String(n) }
+func (n LatexFragment) String() string     { return String(n) }
+func (n FootnoteLink) String() string      { return String(n) }
+func (n RegularLink) String() string       { return String(n) }
+func (n Macro) String() string             { return String(n) }
+func (n Timestamp) String() string         { return String(n) }
+func (n Target) String() string            { return String(n) }
+func (n RadioTarget) String() string       { return String(n) }
 func (n Target) GetPos() Pos               { return n.Pos }
 func (n RadioTarget) GetPos() Pos          { return n.Pos }
 func (n Target) GetEnd() Pos               { return n.EndPos }

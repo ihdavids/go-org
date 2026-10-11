@@ -148,7 +148,7 @@ func (t TableEl) html() string {
 	return out.String()
 }
 
-func (n TableEl) String() string      { return orgWriter.WriteNodesAsString(n) }
+func (n TableEl) String() string      { return String(n) }
 func (n TableEl) GetPos() Pos         { return n.Pos }
 func (n TableEl) GetEnd() Pos         { return n.EndPos }
 func (n TableEl) GetType() NodeType   { return TableElNode }

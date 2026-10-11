@@ -976,7 +976,7 @@ func (self Column) GetEnd() Pos {
 func (self Column) GetPos() Pos {
 	return self.Pos
 }
-func (n Table) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n Table) String() string { return String(n) }
 func (self Table) GetPos() Pos { return self.Pos }
 func (self Table) GetEnd() Pos {
 	if self.Rows != nil && len(self.Rows) > 0 {

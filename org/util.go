@@ -38,3 +38,7 @@ func Insert[T any](arr []T, value T, index int) []T {
 		return Prepend(arr, value)
 	}
 }
+
+func IsNewLineChar(r rune) bool {
+	return r == '\n' || r == '\r'
+}

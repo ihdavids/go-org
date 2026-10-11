@@ -47,7 +47,10 @@ func (n *HTMLWriter) ResetLineBreak() {
 type footnotes struct {
 	mapping map[string]int
 	list    []*FootnoteDefinition
+	unused  map[string]*FootnoteDefinition
 }
+
+var nowebReferenceRegexp = regexp.MustCompile(`<<[^>]+>>`)
 
 var emphasisTags = map[string][]string{
 	"/":   []string{"<em>", "</em>"},
@@ -89,6 +92,7 @@ func NewHTMLWriter() *HTMLWriter {
 		},
 		footnotes: &footnotes{
 			mapping: map[string]int{},
+			unused:  map[string]*FootnoteDefinition{},
 		},
 	}
 }
@@ -115,7 +119,17 @@ func (w *HTMLWriter) Before(d *Document) {
 	if title := d.Get("TITLE"); title != "" && w.Document.GetOption("title") != "nil" {
 		titleDocument := d.Parse(strings.NewReader(title), d.Path)
 		if titleDocument.Error == nil {
-			title = w.WriteNodesAsString(titleDocument.Nodes...)
+			simpleTitle := false
+			if len(titleDocument.Nodes) == 1 {
+				switch p := titleDocument.Nodes[0].(type) {
+				case Paragraph:
+					simpleTitle = true
+					title = w.WriteNodesAsString(p.Children...)
+				}
+			}
+			if !simpleTitle {
+				title = w.WriteNodesAsString(titleDocument.Nodes...)
+			}
 		}
 		w.WriteString(fmt.Sprintf(`<h1 class="title">%s</h1>`+"\n", title))
 	}
@@ -139,6 +153,9 @@ func (w *HTMLWriter) WriteBlock(b Block) {
 	case "SRC":
 		if params[":exports"] == "results" || params[":exports"] == "none" {
 			break
+		}
+		if params[":noweb"] == "strip-export" {
+			content = nowebReferenceRegexp.ReplaceAllString(content, "")
 		}
 		lang := "text"
 		if len(b.Parameters) >= 1 {
@@ -226,7 +243,10 @@ func (w *HTMLWriter) WriteFootnotes(d *Document) {
 	w.WriteString(`<div class="footnotes">` + "\n")
 	w.WriteString(`<hr class="footnotes-separatator">` + "\n")
 	w.WriteString(`<div class="footnote-definitions">` + "\n")
-	for i, definition := range w.footnotes.list {
+
+	// iterate by index instead of ranging, since new footnotes can be added when writing the definitions
+	for i := 0; i < len(w.footnotes.list); i++ {
+		definition := w.footnotes.list[i]
 		id := i + 1
 		if definition == nil {
 			name := ""
@@ -771,7 +791,7 @@ func (w *HTMLWriter) blockContent(name string, children []Node) string {
 		WriteNodes(w, children...)
 		out := w.String()
 		w.Builder, w.htmlEscape = builder, htmlEscape
-		return strings.TrimRightFunc(out, unicode.IsSpace)
+		return strings.TrimRightFunc(strings.TrimLeftFunc(out, IsNewLineChar), unicode.IsSpace)
 	} else {
 		return w.WriteNodesAsString(children...)
 	}
@@ -805,6 +825,14 @@ func (fs *footnotes) add(f FootnoteLink) int {
 	if i, ok := fs.mapping[f.Name]; ok && f.Name != "" {
 		return i
 	}
+
+	if def, ok := fs.unused[f.Name]; ok && f.Name != "" && f.Definition == nil {
+		// if there was an a previously unused definition with the same name, attach it to this link
+		// (this enables footnotes from another footnote's definition)
+		f.Definition = def
+		delete(fs.unused, f.Name)
+	}
+
 	fs.list = append(fs.list, f.Definition)
 	i := len(fs.list) - 1
 	if f.Name != "" {
@@ -816,5 +844,9 @@ func (fs *footnotes) add(f FootnoteLink) int {
 func (fs *footnotes) updateDefinition(f FootnoteDefinition) {
 	if i, ok := fs.mapping[f.Name]; ok {
 		fs.list[i] = &f
+	} else {
+		// this could either be an unused definition or one used in another footnote
+		// save in case it's the latter
+		fs.unused[f.Name] = &f
 	}
 }

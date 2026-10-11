@@ -214,8 +214,8 @@ func (n *Drawer) Append(h *Headline, node Node) {
 	h.Doc.InsertNodeAfter(node, after)
 }
 
-func (n Drawer) String() string         { return orgWriter.WriteNodesAsString(n) }
-func (n PropertyDrawer) String() string { return orgWriter.WriteNodesAsString(n) }
+func (n Drawer) String() string         { return String(n) }
+func (n PropertyDrawer) String() string { return String(n) }
 func (n PropertyDrawer) GetPos() Pos    { return n.Pos }
 func (n PropertyDrawer) GetEnd() Pos {
 	return n.EndPos
